@@ -257,70 +257,112 @@ std::string RelativeTime::to_string () const
 
 }
 
+namespace beast {
+	
+namespace detail {
+	
 #if BEAST_WINDOWS
 
-#include <Windows.h>
+#include <windows.h>
 
-namespace beast {
-
-RelativeTime RelativeTime::fromStartup ()
+double monotonicCurrentTimeInSeconds()
 {
-    ULONGLONG ticks (GetTickCount64());
-
-    return RelativeTime (ticks / 1000.0);
+	return (uint32) GetTickCount64() / 1000.0;
 }
-
-}
-
-#else
+	
+#elif BEAST_MAC || BEAST_IOS
 
 #include <time.h>
 
-namespace beast {
-
-namespace detail {
-
-// Converts a timespec to a RelativeTme
-static RelativeTime toRelativeTime (timespec const& ts)
+static double timebaseRatio()
 {
-    return RelativeTime (ts.tv_sec +
-        ts.tv_nsec / 1000000000.0);
+	struct TimebaseRatio
+	{
+		TimebaseRatio ()
+		{
+			uint64 numerator;
+			double denominator;
+			
+			mach_timebase_info_data_t timebase;
+			(void) mach_timebase_info (&timebase);
+			
+			if (timebase.numer % 1000000 == 0)
+			{
+				numerator   = timebase.numer / 1000000;
+				denominator = timebase.denom * 1000.0;
+			}
+			else
+			{
+				numerator   = timebase.numer;
+				denominator = timebase.denom * (uint64) 1000000 * 1000.0;
+			}
+			
+			ratio = numerator / denominator;
+		}
+		
+		double ratio;
+	};
+	
+	static TimebaseRatio timebaseRatio;
+	
+	return timebaseRatio.ratio;
+	
+}
+	
+double monotonicCurrentTimeInSeconds()
+{
+	return mach_absolute_time() * timebaseRatio();
+}
+	
+#else
+	
+#include <time.h>
+
+double monotonicCurrentTimeInSeconds()
+{
+	timespec t;
+	clock_gettime (CLOCK_MONOTONIC, &t);
+	return t.tv_sec + t.tv_nsec / 1000000000.0;
+}
+	
+#endif
+
+// Converts milliseconds to a RelativeTme
+static RelativeTime toRelativeTime (uint32 ms)
+{
+	return RelativeTime (ms / 1000.0);
 }
 
 // Records and returns the time from process startup
 static RelativeTime getStartupTime()
 {
-    struct StartupTime
-    {
-        StartupTime ()
-            { clock_gettime (CLOCK_MONOTONIC, &ts); }
-        timespec ts;
-    };
-
-    static StartupTime startupTime;
-
-    return toRelativeTime (startupTime.ts);
+	struct StartupTime
+	{
+		StartupTime ()
+		{ s = toRelativeTime (detail::monotonicCurrentTimeInSeconds()); }
+		RelativeTime s;
+	};
+	
+	static StartupTime startupTime;
+	
+	return startupTime.s;
 }
 
 // Used to call getStartupTime as early as possible
 struct StartupTimeStaticInitializer
 {
-    StartupTimeStaticInitializer ()
-        { getStartupTime(); }
+	StartupTimeStaticInitializer ()
+	{ getStartupTime(); }
 };
 
 static StartupTimeStaticInitializer startupTimeStaticInitializer;
-
+	
 }
 
 RelativeTime RelativeTime::fromStartup ()
 {
-    timespec ts;
-    clock_gettime (CLOCK_MONOTONIC, &ts);
-
-    return detail::toRelativeTime (ts) - detail::getStartupTime();
+	return detail::toRelativeTime (detail::monotonicCurrentTimeInSeconds()) - detail::getStartupTime();
 }
 
 }
 
-#endif
