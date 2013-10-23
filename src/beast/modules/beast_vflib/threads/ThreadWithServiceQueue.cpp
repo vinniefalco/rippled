@@ -26,6 +26,7 @@ ThreadWithServiceQueue::ThreadWithServiceQueue (const String& name)
 , m_entryPoints(nullptr)
 , m_calledStart(false)
 , m_calledStop(false)
+, m_interrupted(false)
 {
 }
 
@@ -76,6 +77,16 @@ void ThreadWithServiceQueue::stop (bool const wait)
 	if (wait)
 		waitForThreadToExit();
 }
+	
+void ThreadWithServiceQueue::interrupt ()
+{
+	call (&ThreadWithServiceQueue::doInterrupt, this);
+}
+
+bool ThreadWithServiceQueue::interruptionPoint ()
+{
+	return m_interrupted;
+}
 
 void ThreadWithServiceQueue::run ()
 {
@@ -83,18 +94,39 @@ void ThreadWithServiceQueue::run ()
 	
 	while (! this->threadShouldExit())
 	{
-		m_entryPoints->threadIdle();
 		run_one();
+		
+		bool isInterrupted = m_entryPoints->threadIdle();
+		
+		isInterrupted |= interruptionPoint();
+		
+		if(isInterrupted)
+		{
+			// We put this call into the service queue to make
+			// sure we get through to threadIdle without
+			// waiting
+			call (&ThreadWithServiceQueue::doWakeUp, this);
+		}
 	}
 	
 	m_entryPoints->threadExit();
+}
+
+void ThreadWithServiceQueue::doInterrupt ()
+{
+	m_interrupted = true;
+}
+
+void ThreadWithServiceQueue::doWakeUp ()
+{
+	m_interrupted = false;
 }
 
 //------------------------------------------------------------------------------
 
 namespace detail
 {
-	
+
 //------------------------------------------------------------------------------
 
 class BindableServiceQueueTests
@@ -106,12 +138,13 @@ public:
 	: public ThreadWithServiceQueue::EntryPoints
 	{
 		ThreadWithServiceQueue m_worker;
-		int cCallCount, c1CallCount;
+		int cCallCount, c1CallCount, idleInterruptedCount;
 		
 		BindableServiceQueueRunner()
 		: m_worker("BindableServiceQueueRunner")
 		, cCallCount(0)
 		, c1CallCount(0)
+		, idleInterruptedCount(0)
 		{
 		}
 		
@@ -123,6 +156,11 @@ public:
 		void stop()
 		{
 			m_worker.stop(true);
+		}
+		
+		void interrupt()
+		{
+			m_worker.interrupt();
 		}
 		
 		void c()
@@ -144,19 +182,29 @@ public:
 		{
 			c1CallCount++;
 		}
+		
+		bool threadIdle ()
+		{
+			bool interrupted = m_worker.interruptionPoint ();
+			
+			if(interrupted)
+				idleInterruptedCount++;
+			
+			return interrupted;
+		}
 	};
 		
 	static int const calls = 10000;
 	
 	void performCalls()
 	{
-		beginTestCase("perform calls");
-		
 		Random r;
 		r.setSeedRandomly();
 		
 		BindableServiceQueueRunner runner;
 		
+		beginTestCase("Calls and interruptions");
+								
 		runner.start();
 		
 		for(std::size_t i=0; i<calls; i++)
@@ -168,12 +216,16 @@ public:
 			else
 				runner.c1Impl(wait);
 		}
-
+						
+		for(std::size_t i=0; i<calls; i++)
+			runner.interrupt();
+		
 		runner.stop();
 		
+		// We can only reason that the idle method must have been interrupted
+		// at least once
 		expect ((runner.cCallCount + runner.c1CallCount) == calls);
-		
-		pass();
+		expect (runner.idleInterruptedCount > 0);
 	}
 	
 	void runTest()
