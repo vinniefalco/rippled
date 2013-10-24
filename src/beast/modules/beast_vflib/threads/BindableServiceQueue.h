@@ -25,46 +25,46 @@
 
 namespace beast {
 	
-	template <class Allocator = std::allocator <char> >
-	class BindableServiceQueueType
-	: public ServiceQueueType <Allocator>
+template <class Allocator = std::allocator <char> >
+class BindableServiceQueueType
+: public ServiceQueueType <Allocator>
+{
+public:
+	explicit BindableServiceQueueType (int expectedConcurrency = 1,
+										Allocator alloc = Allocator())
+	: ServiceQueueType<Allocator>(expectedConcurrency, alloc)
+	, queue(*this)
+	, call(*this)
 	{
-	public:
-		explicit BindableServiceQueueType (int expectedConcurrency = 1,
-										   Allocator alloc = Allocator())
-		: ServiceQueueType<Allocator>(expectedConcurrency, alloc)
-		, queue(*this)
-		, call(*this)
-		{
-		}
+	}
 		
-		struct BindHelperPost
-		{
-			BindableServiceQueueType<Allocator>& m_queue;
-			explicit BindHelperPost (BindableServiceQueueType<Allocator>& queue)
-			: m_queue (queue)
-			{ }
-			template <typename F>
-			void operator() (F const& f) const
-			{ m_queue.post ( F (f) ); }
-		};
-		
-		struct BindHelperDispatch
-		{
-			BindableServiceQueueType<Allocator>& m_queue;
-			explicit BindHelperDispatch (BindableServiceQueueType<Allocator>& queue)
-			: m_queue (queue)
-			{ }
-			template <typename F>
-			void operator() (F const& f) const
-			{ m_queue.dispatch ( F (f) ); }
-		};
-		
-		BindHelper <BindHelperPost> const queue;
-		BindHelper <BindHelperDispatch> const call;
+	struct BindHelperPost
+	{
+		BindableServiceQueueType<Allocator>& m_queue;
+		explicit BindHelperPost (BindableServiceQueueType<Allocator>& queue)
+		: m_queue (queue)
+		{ }
+		template <typename F>
+		void operator() (F const& f) const
+		{ m_queue.post ( F (f) ); }
 	};
+		
+	struct BindHelperDispatch
+	{
+		BindableServiceQueueType<Allocator>& m_queue;
+		explicit BindHelperDispatch (BindableServiceQueueType<Allocator>& queue)
+		: m_queue (queue)
+		{ }
+		template <typename F>
+		void operator() (F const& f) const
+		{ m_queue.dispatch ( F (f) ); }
+	};
+		
+	BindHelper <BindHelperPost> const queue;
+	BindHelper <BindHelperDispatch> const call;
+};
 	
-	typedef BindableServiceQueueType <std::allocator <char> > BindableServiceQueue;
+typedef BindableServiceQueueType <std::allocator <char> > BindableServiceQueue;
 	
 }
 

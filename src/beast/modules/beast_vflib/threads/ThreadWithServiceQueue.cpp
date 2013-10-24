@@ -22,104 +22,75 @@
 namespace beast {
 
 ThreadWithServiceQueue::ThreadWithServiceQueue (const String& name)
-: Thread (name)
+: CallQueue(name)
+, m_thread(name, this)
 , m_entryPoints(nullptr)
 , m_calledStart(false)
 , m_calledStop(false)
-, m_interrupted(false)
 {
 }
 
-ThreadWithServiceQueue::~ThreadWithServiceQueue()
+ThreadWithServiceQueue::~ThreadWithServiceQueue ()
 {
 	stop(true);
 }
 
 void ThreadWithServiceQueue::start (EntryPoints* const entryPoints)
 {
-	{
-		CriticalSection::ScopedLockType lock (m_mutex);
-		
-		// start() MUST be called.
-		bassert (!m_calledStart);
-		m_calledStart = true;
-	}
+	// start() MUST be called.
+	bassert (!m_calledStart);
+	m_calledStart = true;
 	
 	m_entryPoints = entryPoints;
 	
-	startThread();
+	m_thread.startThread ();
 }
 
 void ThreadWithServiceQueue::stop (bool const wait)
 {
+	// start() MUST be called.
+	bassert (m_calledStart);
+	
+	if (!m_calledStop)
 	{
-		CriticalSection::ScopedLockType lock (m_mutex);
+		m_calledStop = true;
 		
-		// start() MUST be called.
-		bassert (m_calledStart);
+		queue (&Thread::signalThreadShouldExit, &m_thread);
 		
-		if (!m_calledStop)
-		{
-			m_calledStop = true;
-			
-			{
-				CriticalSection::ScopedUnlockType unlock (m_mutex);
-				
-				call (&Thread::signalThreadShouldExit, this);
-				
-				// something could slip in here
-				
-				// m_queue.close();
-			}
-		}
+		// something could slip in here
+		
+		close ();
 	}
 	
 	if (wait)
-		waitForThreadToExit();
-}
-	
-void ThreadWithServiceQueue::interrupt ()
-{
-	call (&ThreadWithServiceQueue::doInterrupt, this);
+		m_thread.waitForThreadToExit ();
 }
 
-bool ThreadWithServiceQueue::interruptionPoint ()
+bool  ThreadWithServiceQueue::synchronize ()
 {
-	return m_interrupted;
+	bassert (isAssociatedWithCurrentThread ());
+
+	bool didSomething = false;
+
+    while (! m_thread.threadShouldExit())
+	{
+		if(run_one() > 0)
+			didSomething = true;
+	}
+
+	return didSomething;
 }
 
-void ThreadWithServiceQueue::run ()
+void ThreadWithServiceQueue::runThread ()
 {
+	associateWithCurrentThread();
+
 	m_entryPoints->threadInit();
 	
-	while (! this->threadShouldExit())
-	{
-		run_one();
-		
-		bool isInterrupted = m_entryPoints->threadIdle();
-		
-		isInterrupted |= interruptionPoint();
-		
-		if(isInterrupted)
-		{
-			// We put this call into the service queue to make
-			// sure we get through to threadIdle without
-			// waiting
-			call (&ThreadWithServiceQueue::doWakeUp, this);
-		}
-	}
+	while (! m_thread.threadShouldExit())
+		synchronize ();
 	
 	m_entryPoints->threadExit();
-}
-
-void ThreadWithServiceQueue::doInterrupt ()
-{
-	m_interrupted = true;
-}
-
-void ThreadWithServiceQueue::doWakeUp ()
-{
-	m_interrupted = false;
 }
 
 //------------------------------------------------------------------------------
@@ -138,13 +109,15 @@ public:
 	: public ThreadWithServiceQueue::EntryPoints
 	{
 		ThreadWithServiceQueue m_worker;
-		int cCallCount, c1CallCount, idleInterruptedCount;
+		int cCallCount, c1CallCount;
+		int initCalled, exitCalled;
 		
 		BindableServiceQueueRunner()
 		: m_worker("BindableServiceQueueRunner")
 		, cCallCount(0)
 		, c1CallCount(0)
-		, idleInterruptedCount(0)
+		, initCalled(0)
+		, exitCalled(0)
 		{
 		}
 		
@@ -156,11 +129,6 @@ public:
 		void stop()
 		{
 			m_worker.stop(true);
-		}
-		
-		void interrupt()
-		{
-			m_worker.interrupt();
 		}
 		
 		void c()
@@ -182,15 +150,15 @@ public:
 		{
 			c1CallCount++;
 		}
-		
-		bool threadIdle ()
+
+		void threadInit ()
 		{
-			bool interrupted = m_worker.interruptionPoint ();
-			
-			if(interrupted)
-				idleInterruptedCount++;
-			
-			return interrupted;
+			initCalled++;
+		}
+					
+		void threadExit ()
+		{
+			exitCalled++;
 		}
 	};
 		
@@ -216,16 +184,12 @@ public:
 			else
 				runner.c1Impl(wait);
 		}
-						
-		for(std::size_t i=0; i<calls; i++)
-			runner.interrupt();
 		
 		runner.stop();
 		
-		// We can only reason that the idle method must have been interrupted
-		// at least once
 		expect ((runner.cCallCount + runner.c1CallCount) == calls);
-		expect (runner.idleInterruptedCount > 0);
+		expect (runner.initCalled == 1);
+		expect (runner.exitCalled == 1);
 	}
 	
 	void runTest()
@@ -241,6 +205,5 @@ public:
 static BindableServiceQueueTests bindableServiceQueueTests;
 	
 }
-
 
 }

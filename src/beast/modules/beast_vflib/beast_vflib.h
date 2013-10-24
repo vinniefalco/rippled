@@ -22,6 +22,7 @@
 
 #include "functor/BindHelper.h"
 #include "threads/BindableServiceQueue.h"
+#include "threads/CallQueue.h"
 #include "threads/ThreadWithServiceQueue.h"
 
 #endif

@@ -24,68 +24,74 @@
 
 namespace beast {
 	
-	/** TODO: Queued calls no longer interrupt the idle method at the moment
-	 use an explicit call to interrupt() if you want to also interrupt the
-	 idle method when queuing calls
-	 */
-	
-	class ThreadWithServiceQueue
-	: public BindableServiceQueue
-	, public Thread
+/** TODO: Queued calls no longer interrupt the idle method at the moment
+	use an explicit call to interrupt() if you want to also interrupt the
+	idle method when queuing calls
+	*/
+
+class ThreadWithServiceQueue
+: public CallQueue
+{
+public:
+	/** Entry points for a ThreadWithCallQueue.
+		*/
+	class EntryPoints
 	{
 	public:
-		/** Entry points for a ThreadWithCallQueue.
-		 */
-		class EntryPoints
-		{
-		public:
-			virtual ~EntryPoints () { }
+		virtual ~EntryPoints () { }
 			
-			virtual void threadInit () { }
+		virtual void threadInit () { }
 			
-			virtual void threadExit () { }
-			
-			virtual bool threadIdle ()
-			{
-				bool interrupted = false;
-				
-				return interrupted;
-			}
-		};
-		
-		explicit ThreadWithServiceQueue (const String& name);
-		
-		~ThreadWithServiceQueue();
-		
-		void start (EntryPoints* const entryPoints);
-		
-		void stop (bool const wait);
-		
-		// Should be called periodically by the idle function.
-		// There are two possible results:
-		//
-		// #1 Returns false. The idle function may continue or return.
-		// #2 Returns true. The idle function should return as soon as possible.
-		//
-		// May only be called on the service queue thead
-		bool interruptionPoint ();
-
-		/* Interrupts the idle function.
-		 */
-		void interrupt ();
-		
-	private:
-		void run ();
-		void doInterrupt ();
-		void doWakeUp ();
-		
-	private:
-		EntryPoints* m_entryPoints;
-		bool m_calledStart;
-		bool m_calledStop;
-		bool m_interrupted;
-		CriticalSection m_mutex;
+		virtual void threadExit () { }
 	};
+	
+	explicit ThreadWithServiceQueue (const String& name);
+	
+	~ThreadWithServiceQueue();
+	
+	void start (EntryPoints* const entryPoints);
+	
+	void stop (bool const wait);
+	
+	/** Calls all functors in the queue. Blocks if there are no
+	    functors available to run until more functors become
+		available or the queue is stopped
+
+	*/
+	bool synchronize ();
+
+	/** Helper class to work around ThreadWithServiceQueue and Thread both
+	    having a run member
+	*/
+	class Worker
+	: public Thread
+	{
+	public:
+		Worker(const String& name, ThreadWithServiceQueue *parent)
+		: Thread(name)
+		, m_parent(parent)
+		{
+		}
+
+		void run()
+		{
+			m_parent->runThread();
+		}
+
+	private:
+		ThreadWithServiceQueue *m_parent;
+	};
+
+	void runThread ();
+	
+private:
+	EntryPoints* m_entryPoints;
+	bool m_calledStart;
+	bool m_calledStop;
+	Worker m_thread;
+	CriticalSection m_mutex;
+};
+
 }
 
 #endif
