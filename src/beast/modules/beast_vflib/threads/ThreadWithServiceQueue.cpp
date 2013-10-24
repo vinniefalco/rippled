@@ -226,6 +226,8 @@ public:
 	}
 };
 
+static CallQueueTests callQueueTests;
+
 static ThreadWithServiceQueueTests bindableServiceQueueTests;
 
 }

@@ -108,6 +108,10 @@ public:
 	void operator() (F const& f, P1 const& p1, P2 const& p2, P3 const& p3, P4 const& p4, P5 const& p5, P6 const& p6, P7 const& p7, P8 const& p8, P9 const& p9) const
 	{ m_f (bind (f, p1, p2, p3, p4, p5, p6, p7, p8, p9)); }
 #endif
+    
+	template <typename F, class P1, class P2, class P3, class P4, class P5, class P6>
+	void operator() (F const& f, P1 const& p1, P2 const& p2, P3 const& p3, P4 const& p4, P5 const& p5, P6 const& p6) const
+	{ m_f (bind (f, p1, p2, p3, p4, p5, p6)); }
 };
 
 }
