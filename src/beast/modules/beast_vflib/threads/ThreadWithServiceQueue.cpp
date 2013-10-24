@@ -55,7 +55,7 @@ void ThreadWithServiceQueue::stop (bool const wait)
 	{
 		m_calledStop = true;
 		
-		queue (&Thread::signalThreadShouldExit, &m_thread);
+		m_thread.signalThreadShouldExit();
 		
 		// something could slip in here
 		
@@ -69,16 +69,11 @@ void ThreadWithServiceQueue::stop (bool const wait)
 bool  ThreadWithServiceQueue::synchronize ()
 {
 	bassert (isAssociatedWithCurrentThread ());
-
-	bool didSomething = false;
-
-    while (! m_thread.threadShouldExit())
-	{
-		if(run_one() > 0)
-			didSomething = true;
-	}
-
-	return didSomething;
+	
+	if(run () > 0)
+		return true;
+	
+	return false;
 }
 
 void ThreadWithServiceQueue::runThread ()
@@ -89,6 +84,12 @@ void ThreadWithServiceQueue::runThread ()
 	
 	while (! m_thread.threadShouldExit())
 		synchronize ();
+    
+    // Perform the remaining calls in the queue
+    
+    reset();
+    poll();
+    BindableServiceQueue::stop();
 	
 	m_entryPoints->threadExit();
 }
@@ -110,12 +111,15 @@ public:
 	{
 		ThreadWithServiceQueue m_worker;
 		int cCallCount, c1CallCount;
+		int qCallCount, q1CallCount;
 		int initCalled, exitCalled;
 		
 		BindableServiceQueueRunner()
 		: m_worker("BindableServiceQueueRunner")
 		, cCallCount(0)
 		, c1CallCount(0)
+		, qCallCount(0)
+		, q1CallCount(0)
 		, initCalled(0)
 		, exitCalled(0)
 		{
@@ -133,7 +137,7 @@ public:
 		
 		void c()
 		{
-			m_worker.queue(&BindableServiceQueueRunner::cImpl, this);
+			m_worker.call(&BindableServiceQueueRunner::cImpl, this);
 		}
 		
 		void cImpl()
@@ -143,12 +147,32 @@ public:
 		
 		void c1(int p1)
 		{
-			m_worker.queue(&BindableServiceQueueRunner::c1Impl, this, p1);
+			m_worker.call(&BindableServiceQueueRunner::c1Impl, this, p1);
 		}
 		
 		void c1Impl(int p1)
 		{
 			c1CallCount++;
+		}
+
+		void q()
+		{
+			m_worker.queue(&BindableServiceQueueRunner::qImpl, this);
+		}
+		
+		void qImpl()
+		{
+			qCallCount++;
+		}
+		
+		void q1(int p1)
+		{
+			m_worker.queue(&BindableServiceQueueRunner::q1Impl, this, p1);
+		}
+		
+		void q1Impl(int p1)
+		{
+			q1CallCount++;
 		}
 
 		void threadInit ()
@@ -162,7 +186,7 @@ public:
 		}
 	};
 		
-	static int const calls = 10000;
+	static int const calls = 1000;
 	
 	void performCalls()
 	{
@@ -170,11 +194,19 @@ public:
 		r.setSeedRandomly();
 		
 		BindableServiceQueueRunner runner;
-		
-		beginTestCase("Calls and interruptions");
 								
 		runner.start();
 		
+		for(std::size_t i=0; i<calls; i++)
+		{
+			int wait = r.nextLargeNumber(10).toInteger();
+			
+			if(wait % 2)
+				runner.q();
+			else
+				runner.q1Impl(wait);
+		}
+
 		for(std::size_t i=0; i<calls; i++)
 		{
 			int wait = r.nextLargeNumber(10).toInteger();
@@ -188,13 +220,17 @@ public:
 		runner.stop();
 		
 		expect ((runner.cCallCount + runner.c1CallCount) == calls);
+		expect ((runner.qCallCount + runner.q1CallCount) == calls);
 		expect (runner.initCalled == 1);
 		expect (runner.exitCalled == 1);
 	}
 	
 	void runTest()
 	{
-		performCalls ();
+		beginTestCase("Calls and interruptions");
+        
+        for(int i=0; i<100; i++)
+            performCalls ();
 	}
 	
 	BindableServiceQueueTests () : UnitTest ("BindableServiceQueue", "beast")

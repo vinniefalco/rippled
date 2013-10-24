@@ -47,9 +47,9 @@ bool CallQueue::isAssociatedWithCurrentThread () const
 // Can still have pending calls, just can't put new ones in.
 void CallQueue::close ()
 {
-  m_closed.signal ();
+    m_closed.signal ();
 
-  stop();
+    BindableServiceQueue::stop ();
 }
 
 void CallQueue::associateWithCurrentThread()
