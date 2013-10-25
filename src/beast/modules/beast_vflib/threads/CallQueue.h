@@ -292,47 +292,47 @@ public:
         
         int calls = 0;
         
-#if BEAST_VARIADIC_MAX >= 1
+#if BEAST_VARIADIC_MAX >= 2
         m_queue.queue(&CallTracker::doQ0, &m_callTracker); calls++;
         m_queue.queue(&CallTracker::doC0, &m_callTracker); calls++;
 #endif
 
-#if BEAST_VARIADIC_MAX >= 2
+#if BEAST_VARIADIC_MAX >= 3
         m_queue.queue(&CallTracker::doQ1, &m_callTracker, "p1"); calls++;
         m_queue.queue(&CallTracker::doC1, &m_callTracker, "p1"); calls++;
 #endif
 
-#if BEAST_VARIADIC_MAX >= 3
+#if BEAST_VARIADIC_MAX >= 4
         m_queue.queue(&CallTracker::doQ2, &m_callTracker, "p1", "p2"); calls++;
         m_queue.queue(&CallTracker::doC2, &m_callTracker, "p1", "p2"); calls++;
 #endif
 
-#if BEAST_VARIADIC_MAX >= 4
+#if BEAST_VARIADIC_MAX >= 5
         m_queue.queue(&CallTracker::doQ3, &m_callTracker, "p1", "p2", "p3"); calls++;
         m_queue.queue(&CallTracker::doC3, &m_callTracker, "p1", "p2", "p3"); calls++;
 #endif
 
-#if BEAST_VARIADIC_MAX >= 5
+#if BEAST_VARIADIC_MAX >= 6
         m_queue.queue(&CallTracker::doQ4, &m_callTracker, "p1", "p2", "p3", "p4"); calls++;
         m_queue.queue(&CallTracker::doC4, &m_callTracker, "p1", "p2", "p3", "p4"); calls++;
 #endif
 
-#if BEAST_VARIADIC_MAX >= 6
+#if BEAST_VARIADIC_MAX >= 7
         m_queue.queue(&CallTracker::doQ5, &m_callTracker, "p1", "p2", "p3", "p4", "p5"); calls++;
         m_queue.queue(&CallTracker::doC5, &m_callTracker, "p1", "p2", "p3", "p4", "p5"); calls++;
 #endif
 
-#if BEAST_VARIADIC_MAX >= 7
+#if BEAST_VARIADIC_MAX >= 8
         m_queue.queue(&CallTracker::doQ6, &m_callTracker, "p1", "p2", "p3", "p4", "p5", "p6"); calls++;
         m_queue.queue(&CallTracker::doC6, &m_callTracker, "p1", "p2", "p3", "p4", "p5", "p6"); calls++;
 #endif
         
-#if BEAST_VARIADIC_MAX >= 8
+#if BEAST_VARIADIC_MAX >= 9
         m_queue.queue(&CallTracker::doQ7, &m_callTracker, "p1", "p2", "p3", "p4", "p5", "p6", "p7"); calls++;
         m_queue.queue(&CallTracker::doC7, &m_callTracker, "p1", "p2", "p3", "p4", "p5", "p6", "p7"); calls++;
 #endif
 
-#if BEAST_VARIADIC_MAX >= 9
+#if BEAST_VARIADIC_MAX >= 10
         m_queue.queue(&CallTracker::doQ8, &m_callTracker, "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"); calls++;
         m_queue.queue(&CallTracker::doC8, &m_callTracker, "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"); calls++;
 #endif
@@ -343,47 +343,47 @@ public:
         
         expect (performedCalls == calls);
         
-#if BEAST_VARIADIC_MAX >= 1
+#if BEAST_VARIADIC_MAX >= 2
         expect (m_callTracker.c0 == 1);
         expect (m_callTracker.q0 == 1);
 #endif
 
-#if BEAST_VARIADIC_MAX >= 2
+#if BEAST_VARIADIC_MAX >= 3
 		expect (m_callTracker.c1 == 1);
         expect (m_callTracker.q1 == 1);
 #endif
 
-#if BEAST_VARIADIC_MAX >= 3
+#if BEAST_VARIADIC_MAX >= 4
         expect (m_callTracker.c2 == 1);
         expect (m_callTracker.q2 == 1);
 #endif
 
-#if BEAST_VARIADIC_MAX >= 4
+#if BEAST_VARIADIC_MAX >= 5
         expect (m_callTracker.c3 == 1);
         expect (m_callTracker.q3 == 1);
 #endif
 
-#if BEAST_VARIADIC_MAX >= 5
+#if BEAST_VARIADIC_MAX >= 6
         expect (m_callTracker.c4 == 1);
         expect (m_callTracker.q4 == 1);
 #endif
 
-#if BEAST_VARIADIC_MAX >= 6
+#if BEAST_VARIADIC_MAX >= 7
         expect (m_callTracker.c5 == 1);
         expect (m_callTracker.q5 == 1);
 #endif
 
-#if BEAST_VARIADIC_MAX >= 7
+#if BEAST_VARIADIC_MAX >= 8
         expect (m_callTracker.c6 == 1);
         expect (m_callTracker.q6 == 1);
 #endif
 
-#if BEAST_VARIADIC_MAX >= 8
+#if BEAST_VARIADIC_MAX >= 9
         expect (m_callTracker.c7 == 1);
         expect (m_callTracker.q7 == 1);
 #endif
 
-#if BEAST_VARIADIC_MAX >= 9
+#if BEAST_VARIADIC_MAX >= 10
         expect (m_callTracker.c8 == 1);
         expect (m_callTracker.q8 == 1);
 #endif
