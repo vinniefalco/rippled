@@ -85,7 +85,6 @@ private:
 	bool m_calledStart;
 	bool m_calledStop;
 	Worker m_thread;
-	CriticalSection m_mutex;
 };
 
 }
