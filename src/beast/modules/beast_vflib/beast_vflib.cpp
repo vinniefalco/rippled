@@ -20,3 +20,9 @@
 #include "beast_vflib.h"
 
 #include "threads/ThreadWithServiceQueue.cpp"
+
+/** Unit tests for header only classes
+*/
+
+static beast::detail::CallQueueTests callQueueTests;
+static beast::detail::ManualServiceQueueTests manualServiceQueueTests;
