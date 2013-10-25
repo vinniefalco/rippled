@@ -23,5 +23,6 @@
 #include "functor/BindHelper.h"
 #include "threads/CallQueue.h"
 #include "threads/ThreadWithServiceQueue.h"
+#include "threads/ManualServiceQueue.h"
 
 #endif
