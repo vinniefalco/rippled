@@ -118,8 +118,14 @@ class CallQueueTests
 public:
 	struct CallTracker
     {
-        int c0, c1, c2, c3, c4, c5;
-        int q0, q1, q2, q3, q4, q5;
+        int c0, c1, c2, c3, c4, c5, c6, c7, c8;
+        int q0, q1, q2, q3, q4, q5, q6, q7, q8;
+
+		CallTracker()
+		: c0(0), c1(0), c2(0), c3(0), c4(0), c5(0), c6(0), c7(0), c8(0)
+		, q0(0), q1(0), q2(0), q3(0), q4(0), q5(0), q6(0), q7(0), q8(0)
+		{
+		}
         
         void doQ0() { q0++; }
         
@@ -163,6 +169,42 @@ public:
             q5++;
         }
         
+        void doQ6(const String& p1, const String& p2, const String& p3, const String& p4, const String& p5, const String& p6)
+        {
+            bassert(p1 == "p1");
+            bassert(p2 == "p2");
+            bassert(p3 == "p3");
+            bassert(p4 == "p4");
+            bassert(p5 == "p5");
+            bassert(p6 == "p6");
+            q6++;
+        }
+
+        void doQ7(const String& p1, const String& p2, const String& p3, const String& p4, const String& p5, const String& p6, const String& p7)
+        {
+            bassert(p1 == "p1");
+            bassert(p2 == "p2");
+            bassert(p3 == "p3");
+            bassert(p4 == "p4");
+            bassert(p5 == "p5");
+            bassert(p6 == "p6");
+            bassert(p7 == "p7");
+            q7++;
+        }
+
+        void doQ8(const String& p1, const String& p2, const String& p3, const String& p4, const String& p5, const String& p6, const String& p7, const String& p8)
+        {
+            bassert(p1 == "p1");
+            bassert(p2 == "p2");
+            bassert(p3 == "p3");
+            bassert(p4 == "p4");
+            bassert(p5 == "p5");
+            bassert(p6 == "p6");
+            bassert(p7 == "p7");
+            bassert(p8 == "p8");
+            q8++;
+        }
+
         void doC0() { c0++; }
         
         void doC1(const String& p1)
@@ -204,7 +246,43 @@ public:
             bassert(p5 == "p5");
             c5++;
         }
-    };
+        
+		void doC6(const String& p1, const String& p2, const String& p3, const String& p4, const String& p5, const String& p6)
+        {
+            bassert(p1 == "p1");
+            bassert(p2 == "p2");
+            bassert(p3 == "p3");
+            bassert(p4 == "p4");
+            bassert(p5 == "p5");
+            bassert(p6 == "p6");
+            c6++;
+        }
+		
+		void doC7(const String& p1, const String& p2, const String& p3, const String& p4, const String& p5, const String& p6, const String& p7)
+        {
+            bassert(p1 == "p1");
+            bassert(p2 == "p2");
+            bassert(p3 == "p3");
+            bassert(p4 == "p4");
+            bassert(p5 == "p5");
+            bassert(p6 == "p6");
+            bassert(p7 == "p7");
+            c7++;
+        }
+
+		void doC8(const String& p1, const String& p2, const String& p3, const String& p4, const String& p5, const String& p6, const String& p7, const String& p8)
+        {
+            bassert(p1 == "p1");
+            bassert(p2 == "p2");
+            bassert(p3 == "p3");
+            bassert(p4 == "p4");
+            bassert(p5 == "p5");
+            bassert(p6 == "p6");
+            bassert(p7 == "p7");
+            bassert(p8 == "p8");
+            c8++;
+        }
+	};
     
     CallTracker m_callTracker;
     
@@ -214,40 +292,102 @@ public:
         
         int calls = 0;
         
+#if BEAST_VARIADIC_MAX >= 1
         m_queue.queue(&CallTracker::doQ0, &m_callTracker); calls++;
-        m_queue.queue(&CallTracker::doQ1, &m_callTracker, "p1"); calls++;
-        m_queue.queue(&CallTracker::doQ2, &m_callTracker, "p1", "p2"); calls++;
-        m_queue.queue(&CallTracker::doQ3, &m_callTracker, "p1", "p2", "p3"); calls++;
-        m_queue.queue(&CallTracker::doQ4, &m_callTracker, "p1", "p2", "p3", "p4"); calls++;
-        m_queue.queue(&CallTracker::doQ5, &m_callTracker, "p1", "p2", "p3", "p4", "p5"); calls++;
-        
         m_queue.queue(&CallTracker::doC0, &m_callTracker); calls++;
+#endif
+
+#if BEAST_VARIADIC_MAX >= 2
+        m_queue.queue(&CallTracker::doQ1, &m_callTracker, "p1"); calls++;
         m_queue.queue(&CallTracker::doC1, &m_callTracker, "p1"); calls++;
+#endif
+
+#if BEAST_VARIADIC_MAX >= 3
+        m_queue.queue(&CallTracker::doQ2, &m_callTracker, "p1", "p2"); calls++;
         m_queue.queue(&CallTracker::doC2, &m_callTracker, "p1", "p2"); calls++;
+#endif
+
+#if BEAST_VARIADIC_MAX >= 4
+        m_queue.queue(&CallTracker::doQ3, &m_callTracker, "p1", "p2", "p3"); calls++;
         m_queue.queue(&CallTracker::doC3, &m_callTracker, "p1", "p2", "p3"); calls++;
+#endif
+
+#if BEAST_VARIADIC_MAX >= 5
+        m_queue.queue(&CallTracker::doQ4, &m_callTracker, "p1", "p2", "p3", "p4"); calls++;
         m_queue.queue(&CallTracker::doC4, &m_callTracker, "p1", "p2", "p3", "p4"); calls++;
+#endif
+
+#if BEAST_VARIADIC_MAX >= 6
+        m_queue.queue(&CallTracker::doQ5, &m_callTracker, "p1", "p2", "p3", "p4", "p5"); calls++;
         m_queue.queue(&CallTracker::doC5, &m_callTracker, "p1", "p2", "p3", "p4", "p5"); calls++;
+#endif
+
+#if BEAST_VARIADIC_MAX >= 7
+        m_queue.queue(&CallTracker::doQ6, &m_callTracker, "p1", "p2", "p3", "p4", "p5", "p6"); calls++;
+        m_queue.queue(&CallTracker::doC6, &m_callTracker, "p1", "p2", "p3", "p4", "p5", "p6"); calls++;
+#endif
         
+#if BEAST_VARIADIC_MAX >= 8
+        m_queue.queue(&CallTracker::doQ7, &m_callTracker, "p1", "p2", "p3", "p4", "p5", "p6", "p7"); calls++;
+        m_queue.queue(&CallTracker::doC7, &m_callTracker, "p1", "p2", "p3", "p4", "p5", "p6", "p7"); calls++;
+#endif
+
+#if BEAST_VARIADIC_MAX >= 9
+        m_queue.queue(&CallTracker::doQ8, &m_callTracker, "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"); calls++;
+        m_queue.queue(&CallTracker::doC8, &m_callTracker, "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"); calls++;
+#endif
+
         std::size_t performedCalls = m_queue.poll();
         
         m_queue.close();
         
         expect (performedCalls == calls);
         
+#if BEAST_VARIADIC_MAX >= 1
         expect (m_callTracker.c0 == 1);
-        expect (m_callTracker.c1 == 1);
-        expect (m_callTracker.c2 == 1);
-        expect (m_callTracker.c3 == 1);
-        expect (m_callTracker.c4 == 1);
-        expect (m_callTracker.c5 == 1);
-        
         expect (m_callTracker.q0 == 1);
+#endif
+
+#if BEAST_VARIADIC_MAX >= 2
+		expect (m_callTracker.c1 == 1);
         expect (m_callTracker.q1 == 1);
+#endif
+
+#if BEAST_VARIADIC_MAX >= 3
+        expect (m_callTracker.c2 == 1);
         expect (m_callTracker.q2 == 1);
+#endif
+
+#if BEAST_VARIADIC_MAX >= 4
+        expect (m_callTracker.c3 == 1);
         expect (m_callTracker.q3 == 1);
+#endif
+
+#if BEAST_VARIADIC_MAX >= 5
+        expect (m_callTracker.c4 == 1);
         expect (m_callTracker.q4 == 1);
+#endif
+
+#if BEAST_VARIADIC_MAX >= 6
+        expect (m_callTracker.c5 == 1);
         expect (m_callTracker.q5 == 1);
-    }
+#endif
+
+#if BEAST_VARIADIC_MAX >= 7
+        expect (m_callTracker.c6 == 1);
+        expect (m_callTracker.q6 == 1);
+#endif
+
+#if BEAST_VARIADIC_MAX >= 8
+        expect (m_callTracker.c7 == 1);
+        expect (m_callTracker.q7 == 1);
+#endif
+
+#if BEAST_VARIADIC_MAX >= 9
+        expect (m_callTracker.c8 == 1);
+        expect (m_callTracker.q8 == 1);
+#endif
+}
     
     void runTest()
     {
