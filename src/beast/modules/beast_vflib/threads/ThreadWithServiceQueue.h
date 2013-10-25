@@ -25,11 +25,6 @@
 
 namespace beast {
 	
-/** TODO: Queued calls no longer interrupt the idle method at the moment
-	use an explicit call to interrupt() if you want to also interrupt the
-	idle method when queuing calls
-	*/
-
 class ThreadWithServiceQueue
 : public CallQueue
 {
