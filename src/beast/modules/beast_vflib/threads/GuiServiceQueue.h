@@ -51,7 +51,7 @@ public:
         CallQueue::close ();
     }
     
-    void enqueue (detail::ServiceQueueBase::Item* item)
+    void enqueue (ServiceQueueBase::Item* item)
     {
         CallQueue::enqueue (item);
         
