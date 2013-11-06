@@ -1,7 +1,7 @@
 //------------------------------------------------------------------------------
 /*
 	This file is part of Beast: https://github.com/vinniefalco/Beast
-	Copyright Patrick Dehne <patrick@mysonicweb.de> (www.sonicweb-radio.de)
+	Copyright 2013, Vinnie Falco <vinnie.falco@gmail.com>
 
 	Permission to use, copy, modify, and/or distribute this software for any
 	purpose  with  or without fee is hereby granted, provided that the above
@@ -14,16 +14,15 @@
 	WHATSOEVER  RESULTING  FROM  LOSS  OF USE, DATA OR PROFITS, WHETHER IN AN
 	ACTION  OF  CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 	OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- */
+*/
 //==============================================================================
 
-#ifndef BEAST_VFLIB_H_INCLUDED
-#define BEAST_VFLIB_H_INCLUDED
+#ifndef UNITTESTS_JUCEMODULES_H_INCLUDED
+#define UNITTESTS_JUCEMODULES_H_INCLUDED
 
-#include "functor/BindHelper.h"
-#include "threads/CallQueue.h"
-#include "threads/ThreadWithServiceQueue.h"
-#include "threads/ManualServiceQueue.h"
-#include "threads/GuiServiceQueue.h"
+#include "AppConfig.h"
+
+#include "modules/juce_core/juce_core.h"
+#include "modules/juce_events/juce_events.h"
 
 #endif

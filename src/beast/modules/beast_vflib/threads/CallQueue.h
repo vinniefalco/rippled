@@ -68,7 +68,7 @@ public:
      The queue is synchronized after it is closed.
      Can still have pending calls, just can't put new ones in.
      */
-    void close ()
+    virtual void close ()
     {
         m_closed.signal ();
         
