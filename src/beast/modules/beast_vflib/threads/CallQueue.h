@@ -337,6 +337,12 @@ public:
         m_queue.queue(&CallTracker::doC8, &m_callTracker, "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"); calls++;
 #endif
 
+        std::size_t performedCalls = m_queue.poll();
+        
+        m_queue.close();
+        
+        expect (performedCalls == calls);
+        
         expect (m_callTracker.c0 == 1);
         expect (m_callTracker.c1 == 1);
         expect (m_callTracker.c2 == 1);
