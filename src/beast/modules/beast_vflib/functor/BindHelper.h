@@ -2,6 +2,7 @@
 /*
 	This file is part of Beast: https://github.com/vinniefalco/Beast
 	Copyright 2013, Vinnie Falco <vinnie.falco@gmail.com>
+    Copyright Patrick Dehne <patrick@mysonicweb.de> (www.sonicweb-radio.de)
 
 	Permission to use, copy, modify, and/or distribute this software for any
 	purpose  with  or without fee is hereby granted, provided that the above
@@ -71,6 +72,10 @@ public:
 	template <typename F, class P1, class P2, class P3, class P4, class P5>
 	void operator() (F const& f, P1 const& p1, P2 const& p2, P3 const& p3, P4 const& p4, P5 const& p5) const
 	{ m_f (bind (f, p1, p2, p3, p4, p5)); }
+    
+	template <typename F, class P1, class P2, class P3, class P4, class P5, class P6>
+	void operator() (F const& f, P1 const& p1, P2 const& p2, P3 const& p3, P4 const& p4, P5 const& p5, P6 const& p6) const
+	{ m_f (bind (f, p1, p2, p3, p4, p5, p6)); }
 };
 
 }

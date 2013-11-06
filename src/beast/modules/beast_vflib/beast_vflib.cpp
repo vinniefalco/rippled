@@ -19,5 +19,4 @@
 
 #include "beast_vflib.h"
 
-#include "threads/CallQueue.cpp"
 #include "threads/ThreadWithServiceQueue.cpp"

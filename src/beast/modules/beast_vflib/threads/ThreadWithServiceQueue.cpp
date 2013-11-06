@@ -2,6 +2,7 @@
 /*
 	This file is part of Beast: https://github.com/vinniefalco/Beast
 	Copyright 2013, Vinnie Falco <vinnie.falco@gmail.com>
+    Copyright Patrick Dehne <patrick@mysonicweb.de> (www.sonicweb-radio.de)
 
 	Permission to use, copy, modify, and/or distribute this software for any
 	purpose  with  or without fee is hereby granted, provided that the above
@@ -66,30 +67,17 @@ void ThreadWithServiceQueue::stop (bool const wait)
 		m_thread.waitForThreadToExit ();
 }
 
-bool  ThreadWithServiceQueue::synchronize ()
-{
-	bassert (isAssociatedWithCurrentThread ());
-	
-	if(run () > 0)
-		return true;
-	
-	return false;
-}
-
 void ThreadWithServiceQueue::runThread ()
 {
-	associateWithCurrentThread();
-
-	m_entryPoints->threadInit();
+	m_entryPoints->threadInit ();
 	
-	while (! m_thread.threadShouldExit())
-		synchronize ();
+	while (! m_thread.threadShouldExit ())
+        run ();
     
     // Perform the remaining calls in the queue
     
-    reset();
-    poll();
-    BindableServiceQueue::stop();
+    reset ();
+    poll ();
 	
 	m_entryPoints->threadExit();
 }
@@ -101,12 +89,12 @@ namespace detail
 
 //------------------------------------------------------------------------------
 
-class BindableServiceQueueTests
+class ThreadWithServiceQueueTests
 : public UnitTest
 {
 public:
 	
-	struct BindableServiceQueueRunner
+	struct ThreadWithServiceQueueRunner
 	: public ThreadWithServiceQueue::EntryPoints
 	{
 		ThreadWithServiceQueue m_worker;
@@ -114,8 +102,8 @@ public:
 		int qCallCount, q1CallCount;
 		int initCalled, exitCalled;
 		
-		BindableServiceQueueRunner()
-		: m_worker("BindableServiceQueueRunner")
+		ThreadWithServiceQueueRunner()
+		: m_worker("ThreadWithServiceQueueRunner")
 		, cCallCount(0)
 		, c1CallCount(0)
 		, qCallCount(0)
@@ -137,7 +125,7 @@ public:
 		
 		void c()
 		{
-			m_worker.call(&BindableServiceQueueRunner::cImpl, this);
+			m_worker.call(&ThreadWithServiceQueueRunner::cImpl, this);
 		}
 		
 		void cImpl()
@@ -147,7 +135,7 @@ public:
 		
 		void c1(int p1)
 		{
-			m_worker.call(&BindableServiceQueueRunner::c1Impl, this, p1);
+			m_worker.call(&ThreadWithServiceQueueRunner::c1Impl, this, p1);
 		}
 		
 		void c1Impl(int p1)
@@ -157,7 +145,7 @@ public:
 
 		void q()
 		{
-			m_worker.queue(&BindableServiceQueueRunner::qImpl, this);
+			m_worker.queue(&ThreadWithServiceQueueRunner::qImpl, this);
 		}
 		
 		void qImpl()
@@ -167,7 +155,7 @@ public:
 		
 		void q1(int p1)
 		{
-			m_worker.queue(&BindableServiceQueueRunner::q1Impl, this, p1);
+			m_worker.queue(&ThreadWithServiceQueueRunner::q1Impl, this, p1);
 		}
 		
 		void q1Impl(int p1)
@@ -179,7 +167,7 @@ public:
 		{
 			initCalled++;
 		}
-					
+        
 		void threadExit ()
 		{
 			exitCalled++;
@@ -193,7 +181,7 @@ public:
 		Random r;
 		r.setSeedRandomly();
 		
-		BindableServiceQueueRunner runner;
+		ThreadWithServiceQueueRunner runner;
 								
 		runner.start();
 		
@@ -227,19 +215,21 @@ public:
 	
 	void runTest()
 	{
-		beginTestCase("Calls and interruptions");
+		beginTestCase("Calls");
         
         for(int i=0; i<100; i++)
             performCalls ();
 	}
 	
-	BindableServiceQueueTests () : UnitTest ("BindableServiceQueue", "beast")
+	ThreadWithServiceQueueTests () : UnitTest ("ThreadWithServiceQueue", "beast")
 	{
 	}
 };
 
-static BindableServiceQueueTests bindableServiceQueueTests;
-	
+static CallQueueTests callQueueTests;
+
+static ThreadWithServiceQueueTests bindableServiceQueueTests;
+
 }
 
 }
