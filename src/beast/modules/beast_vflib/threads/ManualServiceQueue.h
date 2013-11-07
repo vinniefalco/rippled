@@ -58,11 +58,13 @@ class ManualServiceQueueTests
 public:
 	struct CallTracker
     {
+        ManualServiceQueueTests *unitTest;
         int c0, c1;
         int q0, q1;
 
-		CallTracker()
-		: c0(0), c1(0)
+		CallTracker(ManualServiceQueueTests *parent)
+		: unitTest(parent)
+        , c0(0), c1(0)
 		, q0(0), q1(0)
 		{
 		}
@@ -71,7 +73,7 @@ public:
         
         void doQ1(const String& p1)
         {
-            bassert(p1 == "p1");
+            unitTest->expect(p1 == "p1");
             q1++;
         }
 
@@ -79,7 +81,7 @@ public:
         
         void doC1(const String& p1)
         {
-            bassert(p1 == "p1");
+            unitTest->expect(p1 == "p1");
             c1++;
         }
     };
@@ -109,7 +111,7 @@ public:
 
 		for(std::size_t i=0; i<batches; i++)
 		{
-            CallTracker ct;
+            CallTracker ct(this);
 
 		    std::size_t batchSize = r.nextLargeNumber(10).toInteger();
 			

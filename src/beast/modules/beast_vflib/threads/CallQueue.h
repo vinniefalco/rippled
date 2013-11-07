@@ -118,11 +118,13 @@ class CallQueueTests
 public:
     struct CallTracker
     {
+        CallQueueTests *unitTest;
         int c0, c1, c2, c3, c4, c5, c6, c7, c8;
         int q0, q1, q2, q3, q4, q5, q6, q7, q8;
         
-        CallTracker()
-        : c0(0), c1(0), c2(0), c3(0), c4(0), c5(0), c6(0), c7(0), c8(0)
+        CallTracker(CallQueueTests *parent)
+        : unitTest(parent)
+        , c0(0), c1(0), c2(0), c3(0), c4(0), c5(0), c6(0), c7(0), c8(0)
         , q0(0), q1(0), q2(0), q3(0), q4(0), q5(0), q6(0), q7(0), q8(0)
         {
         }
@@ -131,77 +133,77 @@ public:
         
         void doQ1(const String& p1)
         {
-            bassert(p1 == "p1");
+            unitTest->expect(p1 == "p1");
             q1++;
         }
         
         void doQ2(const String& p1, const String& p2)
         {
-            bassert(p1 == "p1");
-            bassert(p2 == "p2");
+            unitTest->expect(p1 == "p1");
+            unitTest->expect(p2 == "p2");
             q2++;
         }
         
         void doQ3(const String& p1, const String& p2, const String& p3)
         {
-            bassert(p1 == "p1");
-            bassert(p2 == "p2");
-            bassert(p3 == "p3");
+            unitTest->expect(p1 == "p1");
+            unitTest->expect(p2 == "p2");
+            unitTest->expect(p3 == "p3");
             q3++;
         }
         
         void doQ4(const String& p1, const String& p2, const String& p3, const String& p4)
         {
-            bassert(p1 == "p1");
-            bassert(p2 == "p2");
-            bassert(p3 == "p3");
-            bassert(p4 == "p4");
+            unitTest->expect(p1 == "p1");
+            unitTest->expect(p2 == "p2");
+            unitTest->expect(p3 == "p3");
+            unitTest->expect(p4 == "p4");
             q4++;
         }
         
         void doQ5(const String& p1, const String& p2, const String& p3, const String& p4, const String& p5)
         {
-            bassert(p1 == "p1");
-            bassert(p2 == "p2");
-            bassert(p3 == "p3");
-            bassert(p4 == "p4");
-            bassert(p5 == "p5");
+            unitTest->expect(p1 == "p1");
+            unitTest->expect(p2 == "p2");
+            unitTest->expect(p3 == "p3");
+            unitTest->expect(p4 == "p4");
+            unitTest->expect(p5 == "p5");
             q5++;
         }
         
         void doQ6(const String& p1, const String& p2, const String& p3, const String& p4, const String& p5, const String& p6)
         {
-            bassert(p1 == "p1");
-            bassert(p2 == "p2");
-            bassert(p3 == "p3");
-            bassert(p4 == "p4");
-            bassert(p5 == "p5");
-            bassert(p6 == "p6");
+            unitTest->expect(p1 == "p1");
+            unitTest->expect(p2 == "p2");
+            unitTest->expect(p3 == "p3");
+            unitTest->expect(p4 == "p4");
+            unitTest->expect(p5 == "p5");
+            unitTest->expect(p6 == "p6");
             q6++;
         }
         
         void doQ7(const String& p1, const String& p2, const String& p3, const String& p4, const String& p5, const String& p6, const String& p7)
         {
-            bassert(p1 == "p1");
-            bassert(p2 == "p2");
-            bassert(p3 == "p3");
-            bassert(p4 == "p4");
-            bassert(p5 == "p5");
-            bassert(p6 == "p6");
-            bassert(p7 == "p7");
+            unitTest->expect(p1 == "p1");
+            unitTest->expect(p2 == "p2");
+            unitTest->expect(p3 == "p3");
+            unitTest->expect(p4 == "p4");
+            unitTest->expect(p5 == "p5");
+            unitTest->expect(p6 == "p6");
+            unitTest->expect(p7 == "p7");
             q7++;
         }
         
         void doQ8(const String& p1, const String& p2, const String& p3, const String& p4, const String& p5, const String& p6, const String& p7, const String& p8)
         {
-            bassert(p1 == "p1");
-            bassert(p2 == "p2");
-            bassert(p3 == "p3");
-            bassert(p4 == "p4");
-            bassert(p5 == "p5");
-            bassert(p6 == "p6");
-            bassert(p7 == "p7");
-            bassert(p8 == "p8");
+            unitTest->expect(p1 == "p1");
+            unitTest->expect(p2 == "p2");
+            unitTest->expect(p3 == "p3");
+            unitTest->expect(p4 == "p4");
+            unitTest->expect(p5 == "p5");
+            unitTest->expect(p6 == "p6");
+            unitTest->expect(p7 == "p7");
+            unitTest->expect(p8 == "p8");
             q8++;
         }
         
@@ -209,77 +211,77 @@ public:
         
         void doC1(const String& p1)
         {
-            bassert(p1 == "p1");
+            unitTest->expect(p1 == "p1");
             c1++;
         }
         
         void doC2(const String& p1, const String& p2)
         {
-            bassert(p1 == "p1");
-            bassert(p2 == "p2");
+            unitTest->expect(p1 == "p1");
+            unitTest->expect(p2 == "p2");
             c2++;
         }
         
         void doC3(const String& p1, const String& p2, const String& p3)
         {
-            bassert(p1 == "p1");
-            bassert(p2 == "p2");
-            bassert(p3 == "p3");
+            unitTest->expect(p1 == "p1");
+            unitTest->expect(p2 == "p2");
+            unitTest->expect(p3 == "p3");
             c3++;
         }
         
         void doC4(const String& p1, const String& p2, const String& p3, const String& p4)
         {
-            bassert(p1 == "p1");
-            bassert(p2 == "p2");
-            bassert(p3 == "p3");
-            bassert(p4 == "p4");
+            unitTest->expect(p1 == "p1");
+            unitTest->expect(p2 == "p2");
+            unitTest->expect(p3 == "p3");
+            unitTest->expect(p4 == "p4");
             c4++;
         }
         
         void doC5(const String& p1, const String& p2, const String& p3, const String& p4, const String& p5)
         {
-            bassert(p1 == "p1");
-            bassert(p2 == "p2");
-            bassert(p3 == "p3");
-            bassert(p4 == "p4");
-            bassert(p5 == "p5");
+            unitTest->expect(p1 == "p1");
+            unitTest->expect(p2 == "p2");
+            unitTest->expect(p3 == "p3");
+            unitTest->expect(p4 == "p4");
+            unitTest->expect(p5 == "p5");
             c5++;
         }
         
         void doC6(const String& p1, const String& p2, const String& p3, const String& p4, const String& p5, const String& p6)
         {
-            bassert(p1 == "p1");
-            bassert(p2 == "p2");
-            bassert(p3 == "p3");
-            bassert(p4 == "p4");
-            bassert(p5 == "p5");
-            bassert(p6 == "p6");
+            unitTest->expect(p1 == "p1");
+            unitTest->expect(p2 == "p2");
+            unitTest->expect(p3 == "p3");
+            unitTest->expect(p4 == "p4");
+            unitTest->expect(p5 == "p5");
+            unitTest->expect(p6 == "p6");
             c6++;
         }
         
         void doC7(const String& p1, const String& p2, const String& p3, const String& p4, const String& p5, const String& p6, const String& p7)
         {
-            bassert(p1 == "p1");
-            bassert(p2 == "p2");
-            bassert(p3 == "p3");
-            bassert(p4 == "p4");
-            bassert(p5 == "p5");
-            bassert(p6 == "p6");
-            bassert(p7 == "p7");
+            unitTest->expect(p1 == "p1");
+            unitTest->expect(p2 == "p2");
+            unitTest->expect(p3 == "p3");
+            unitTest->expect(p4 == "p4");
+            unitTest->expect(p5 == "p5");
+            unitTest->expect(p6 == "p6");
+            unitTest->expect(p7 == "p7");
             c7++;
         }
         
         void doC8(const String& p1, const String& p2, const String& p3, const String& p4, const String& p5, const String& p6, const String& p7, const String& p8)
         {
-            bassert(p1 == "p1");
-            bassert(p2 == "p2");
-            bassert(p3 == "p3");
-            bassert(p4 == "p4");
-            bassert(p5 == "p5");
-            bassert(p6 == "p6");
-            bassert(p7 == "p7");
-            bassert(p8 == "p8");
+            unitTest->expect(p1 == "p1");
+            unitTest->expect(p2 == "p2");
+            unitTest->expect(p3 == "p3");
+            unitTest->expect(p4 == "p4");
+            unitTest->expect(p5 == "p5");
+            unitTest->expect(p6 == "p6");
+            unitTest->expect(p7 == "p7");
+            unitTest->expect(p8 == "p8");
             c8++;
         }
     };
@@ -366,6 +368,7 @@ public:
     CallQueueTests ()
     : UnitTest ("CallQueue", "beast")
     , m_queue("CallQueue Test Queue")
+    , m_callTracker(this)
     {
     }
     
