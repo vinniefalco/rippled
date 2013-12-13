@@ -48,6 +48,11 @@ public:
         setType (type);
     }
 
+    STObject (SField::ref name, boost::ptr_vector<SerializedType>& data) : SerializedType (name), mType (NULL)
+    {
+        mData.swap (data);
+    }
+
     UPTR_T<STObject> oClone () const
     {
         return UPTR_T<STObject> (new STObject (*this));
@@ -295,24 +300,9 @@ private:
     }
     */
 
-    // VFALCO TODO these parameters should not be const references.
-    template <typename T, typename U>
-    static T range_check_cast (const U& value, const T& minimum, const T& maximum)
-    {
-        if ((value < minimum) || (value > maximum))
-            throw std::runtime_error ("Value out of range");
-
-        return static_cast<T> (value);
-    }
-
     STObject* duplicate () const
     {
         return new STObject (*this);
-    }
-
-    STObject (SField::ref name, boost::ptr_vector<SerializedType>& data) : SerializedType (name), mType (NULL)
-    {
-        mData.swap (data);
     }
 
 private:
@@ -321,6 +311,16 @@ private:
 };
 
 //------------------------------------------------------------------------------
+
+// VFALCO TODO these parameters should not be const references.
+template <typename T, typename U>
+static T range_check_cast (const U& value, const T& minimum, const T& maximum)
+{
+    if ((value < minimum) || (value > maximum))
+        throw std::runtime_error ("Value out of range");
+
+    return static_cast<T> (value);
+}
 
 inline STObject::iterator range_begin (STObject& x)
 {
