@@ -679,7 +679,7 @@ bool STParsedJSON::parse (std::string const& json_name,
                     // TODO: There doesn't seem to be a nice way to get just the
                     // first/only key in an object without copying all keys into
                     // a vector
-                    std::string const objectName (value[i].getMemberNames()[0]);;
+                    std::string const objectName (value[i].getMemberNames()[0]);
                     SField::ref const nameField (SField::getField(objectName));
                     Json::Value const objectFields (value[i][objectName]);
 
@@ -693,7 +693,7 @@ bool STParsedJSON::parse (std::string const& json_name,
                         if (! success)
                             return false;
                     }
-                    tail->push_back (*sub_object_.release ());
+                    tail->push_back (*sub_object_);
                 }
             }
             catch (...)
@@ -752,9 +752,9 @@ public:
         {
             STParsedJSON parsed ("tx_json", jsonObject);
             std::string const actualError (serializeJsonValue(parsed.error));
-            unexpected ( actualError != expectedError,
-                         "Expected error: " + expectedError +
-                         "Got error:      " + actualError );
+            unexpected (    actualError       != expectedError,
+                         "\nExpected error: "  + expectedError +
+                           "Got error:      "  + actualError );
         }
         else
         {
@@ -763,7 +763,7 @@ public:
     }
 
     void jsonParsingTestCase (std::string const& testName,
-                                              std::string const& text)
+                              std::string const& text)
     {
         jsonParsingTestCase(testName, "null", text);
     }
@@ -882,7 +882,7 @@ public:
     void testMalformedFieldInArray()
     {
         jsonParsingTestCase (
-            "malformed account",
+            "malformed account inside array object",
             ("{\"error\":\"invalidParams\","
               "\"error_code\":25,"
               "\"error_message\":"
