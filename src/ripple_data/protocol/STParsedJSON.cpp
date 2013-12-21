@@ -879,10 +879,23 @@ public:
         );
     }
 
+    void testMalformedFieldInArray()
+    {
+        jsonParsingTestCase (
+            "malformed account",
+            ("{\"error\":\"invalidParams\","
+              "\"error_code\":25,"
+              "\"error_message\":"
+                 "\"Field 'tx_json.AffectedNodes[0].ModifiedNode.Account' has invalid data.\"}"),
+            "{\"AffectedNodes\" : [{\"ModifiedNode\" : {\"Account\" : \"seriously!!???\"}}]}"
+        );
+    }
+
     void runTest ()
     {
         testTransactionWithTransactionMetaData();
         testMalformedAccount();
+        testMalformedFieldInArray();
     }
 };
 
