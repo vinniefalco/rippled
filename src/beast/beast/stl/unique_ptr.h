@@ -157,6 +157,15 @@ public:
     */
     ObjectType* release()                                                  { ObjectType* const o = object; object = nullptr; return o; }
 
+    void reset (ObjectType* object_)
+    {
+        if (object != object_)
+        {
+            ContainerDeletePolicy <ObjectType>::destroy (object);
+            object = object_;
+        }
+    }
+
     //==============================================================================
     /** Swaps this object with that of another unique_ptr.
         The two objects simply exchange their pointers.
