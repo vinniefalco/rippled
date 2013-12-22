@@ -65,6 +65,18 @@ static inline const uint160& get_u160_one ()
 #define ACCOUNT_XRP         get_u160_zero()
 #define ACCOUNT_ONE         get_u160_one()                  // Used as a place holder.
 
+/** A type which can be exported to a well known binary format.
+    
+    A SerializedType:
+        - Always a field
+        - Can always go inside an eligible enclosing SerializedType
+            (such as STArray)
+        - Has a field name
+        
+
+    Like JSON, a SerializedObject is a basket which has rules
+    on what it can hold.
+*/
 // VFALCO TODO Document this as it looks like a central class.
 //             STObject is derived from it
 //
@@ -88,6 +100,9 @@ public:
         return UPTR_T<SerializedType> (new SerializedType (name));
     }
 
+    /** A SerializeType is a field.
+        This sets the name.
+    */
     void setFName (SField::ref n)
     {
         fName = &n;

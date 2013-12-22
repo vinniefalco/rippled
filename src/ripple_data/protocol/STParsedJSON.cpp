@@ -686,7 +686,8 @@ bool STParsedJSON::parse (std::string const& json_name,
                     unique_ptr <STObject> sub_object_;
                     {
                         std::stringstream ss;
-                        ss << json_name << "." << "[" << i << "]." << objectName;
+                        ss << json_name << "." << fieldName <<
+                            "[" << i << "]." << objectName;
                         bool const success (parse (ss.str (), objectFields,
                             nameField, depth + 1, sub_object_));
                         if (! success)
