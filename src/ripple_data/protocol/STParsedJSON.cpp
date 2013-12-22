@@ -413,7 +413,7 @@ bool STParsedJSON::parse (std::string const& json_name,
                 error = array_expected (json_name, fieldName);
                 return false;
             }
-            
+
             try
             {
                 data.push_back (new STVector256 (field));
@@ -679,7 +679,7 @@ bool STParsedJSON::parse (std::string const& json_name,
                     // TODO: There doesn't seem to be a nice way to get just the
                     // first/only key in an object without copying all keys into
                     // a vector
-                    std::string const objectName (value[i].getMemberNames()[0]);;
+                    std::string const objectName (value[i].getMemberNames()[0]);
                     SField::ref const nameField (SField::getField(objectName));
                     Json::Value const objectFields (value[i][objectName]);
 
@@ -693,7 +693,7 @@ bool STParsedJSON::parse (std::string const& json_name,
                         if (! success)
                             return false;
                     }
-                    tail->push_back (*sub_object_.release ());
+                    tail->push_back (*sub_object_);
                 }
             }
             catch (...)
@@ -714,4 +714,192 @@ bool STParsedJSON::parse (std::string const& json_name,
     return true;
 }
 
-}
+//------------------------------------------------------------------------------
+
+class STParsedJSONTests : public UnitTest
+{
+public:
+    STParsedJSONTests () : UnitTest ("STParsedJSON", "ripple")
+    {
+    }
+
+    bool parseJSONString (const std::string& json, Json::Value& to)
+    {
+        Json::Reader reader;
+        return (reader.parse(json, to) &&
+               !to.isNull() &&
+                to.isObject());
+    }
+
+    std::string serializeJsonValue (const Json::Value& json)
+    {
+        Json::FastWriter writer;
+        return writer.write(json);
+    }
+
+    void jsonParsingTestCase (std::string const& testName,
+                              std::string expectedError,
+                              std::string const& text)
+    {
+        beginTestCase (testName);
+        // Json::FastWriter always appends a `\n`, this is the easiest way to
+        // normalize the two values for later comparison;
+        expectedError.append("\n");
+
+        Json::Value jsonObject;
+        bool parsedOK (parseJSONString(text, jsonObject));
+        if (parsedOK)
+        {
+            STParsedJSON parsed ("tx_json", jsonObject);
+            std::string const actualError (serializeJsonValue(parsed.error));
+            unexpected (    actualError       != expectedError,
+                         "\nExpected error: "  + expectedError +
+                           "Got error:      "  + actualError );
+        }
+        else
+        {
+            fail ("Error: couldn't parse Json::Value from: " + text);
+        }
+    }
+
+    void jsonParsingTestCase (std::string const& testName,
+                              std::string const& text)
+    {
+        jsonParsingTestCase(testName, "null", text);
+    }
+
+    void testTransactionWithTransactionMetaData ()
+    {
+        jsonParsingTestCase (
+            "transaction with metadata",
+            // "What the fffffff",
+            "{"
+            "  \"Account\": \"rMWUykAmNQDaM9poSes8VLDZDDKEbmo7MX\","
+            "  \"Fee\": \"10\","
+            "  \"Flags\": 0,"
+            "  \"OfferSequence\": 701424,"
+            "  \"Sequence\": 701542,"
+            "  \"SigningPubKey\": \"0256C64F0378DCCCB4E0224B36F7ED1E5586455FF105F760245ADB35A8B03A25FD\","
+            "  \"TransactionType\": \"OfferCancel\","
+            "  \"TxnSignature\": \"3046022100E6F4B1830613531489EBBD8E97B086DA3893A8518904A40BB0567A40ABB6C71A022100F1BE31EA455441F609207D90EA7F42D9F45412AF01541049489EE6487D51851D\","
+            "  \"hash\": \"2D959E98A6A914BFA789751A7A31536D893B1A12D69A833FA56207C067E6C637\","
+            "  \"TransactionMetaData\": {"
+            "    \"AffectedNodes\": ["
+            "      {"
+            "        \"ModifiedNode\": {"
+            "          \"FinalFields\": {"
+            "            \"Flags\": 0,"
+            "            \"IndexNext\": \"0000000000001EA1\","
+            "            \"IndexPrevious\": \"0000000000001E9F\","
+            "            \"Owner\": \"rMWUykAmNQDaM9poSes8VLDZDDKEbmo7MX\","
+            "            \"RootIndex\": \"2114A41BB356843CE99B2858892C8F1FEF634B09F09AF2EB3E8C9AA7FD0E3A1A\""
+            "          },"
+            "          \"LedgerEntryType\": \"DirectoryNode\","
+            "          \"LedgerIndex\": \"508544FFDC3D3059BEBF150C3AEA1D04AD1F69FA0321C8C2C583946E123BC42F\""
+            "        }"
+            "      },"
+            "      {"
+            "        \"ModifiedNode\": {"
+            "          \"FinalFields\": {"
+            "            \"Account\": \"rMWUykAmNQDaM9poSes8VLDZDDKEbmo7MX\","
+            "            \"Balance\": \"1992984067\","
+            "            \"Flags\": 0,"
+            "            \"OwnerCount\": 55,"
+            "            \"Sequence\": 701543"
+            "          },"
+            "          \"LedgerEntryType\": \"AccountRoot\","
+            "          \"LedgerIndex\": \"56091AD066271ED03B106812AD376D48F126803665E3ECBFDBBB7A3FFEB474B2\","
+            "          \"PreviousFields\": {"
+            "            \"Balance\": \"1992984077\","
+            "            \"OwnerCount\": 56,"
+            "            \"Sequence\": 701542"
+            "          },"
+            "          \"PreviousTxnID\": \"3CFB86480839AD620B8A6217BE1832DD886EB42013829FECB34DE235D43FE87E\","
+            "          \"PreviousTxnLgrSeq\": 2596381"
+            "        }"
+            "      },"
+            "      {"
+            "        \"ModifiedNode\": {"
+            "          \"FinalFields\": {"
+            "            \"ExchangeRate\": \"5616323607D3C710\","
+            "            \"Flags\": 0,"
+            "            \"RootIndex\": \"5943CB2C05B28743AADF0AE47E9C57E9C15BD23284CF6DA95616323607D3C710\","
+            "            \"TakerGetsCurrency\": \"0000000000000000000000004254430000000000\","
+            "            \"TakerGetsIssuer\": \"92D705968936C419CE614BF264B5EEB1CEA47FF4\","
+            "            \"TakerPaysCurrency\": \"0000000000000000000000004C54430000000000\","
+            "            \"TakerPaysIssuer\": \"92D705968936C419CE614BF264B5EEB1CEA47FF4\""
+            "          },"
+            "          \"LedgerEntryType\": \"DirectoryNode\","
+            "          \"LedgerIndex\": \"5943CB2C05B28743AADF0AE47E9C57E9C15BD23284CF6DA95616323607D3C710\""
+            "        }"
+            "      },"
+            "      {"
+            "        \"DeletedNode\": {"
+            "          \"FinalFields\": {"
+            "            \"Account\": \"rMWUykAmNQDaM9poSes8VLDZDDKEbmo7MX\","
+            "            \"BookDirectory\": \"5943CB2C05B28743AADF0AE47E9C57E9C15BD23284CF6DA95616323607D3C710\","
+            "            \"BookNode\": \"0000000000000000\","
+            "            \"Flags\": 0,"
+            "            \"OwnerNode\": \"0000000000001EA0\","
+            "            \"PreviousTxnID\": \"5CF4FF1539346CE8FC2EF120E746D292EFB64B54589434EA6CC0FBFAFF4E8C05\","
+            "            \"PreviousTxnLgrSeq\": 2596240,"
+            "            \"Sequence\": 701424,"
+            "            \"TakerGets\": {"
+            "              \"currency\": \"BTC\","
+            "              \"issuer\": \"rNPRNzBB92BVpAhhZr4iXDTveCgV5Pofm9\","
+            "              \"value\": \"0.4032663682\""
+            "            },"
+            "            \"TakerPays\": {"
+            "              \"currency\": \"LTC\","
+            "              \"issuer\": \"rNPRNzBB92BVpAhhZr4iXDTveCgV5Pofm9\","
+            "              \"value\": \"25.1947\""
+            "            }"
+            "          },"
+            "          \"LedgerEntryType\": \"Offer\","
+            "          \"LedgerIndex\": \"EF2C9F1C59DD91E1545DA9483258D6C90C344A640C1088B1EE054E428FF49F99\""
+            "        }"
+            "      }"
+            "    ],"
+            "    \"TransactionIndex\": 0,"
+            "    \"TransactionResult\": \"tesSUCCESS\""
+            "  }"
+            "}"
+        );
+    }
+
+    void testMalformedAccount()
+    {
+        jsonParsingTestCase (
+            "malformed account",
+            ("{\"error\":\"invalidParams\","
+              "\"error_code\":25,"
+              "\"error_message\":"
+                 "\"Field 'tx_json.Account' has invalid data.\"}"),
+            "{\"Account\" : \"seriously!!???\"}"
+        );
+    }
+
+    void testMalformedFieldInArray()
+    {
+        jsonParsingTestCase (
+            "malformed account inside array object",
+            ("{\"error\":\"invalidParams\","
+              "\"error_code\":25,"
+              "\"error_message\":"
+                 "\"Field 'tx_json.AffectedNodes[0].ModifiedNode.Account' has invalid data.\"}"),
+            "{\"AffectedNodes\" : [{\"ModifiedNode\" : {\"Account\" : \"seriously!!???\"}}]}"
+        );
+    }
+
+    void runTest ()
+    {
+        testTransactionWithTransactionMetaData();
+        testMalformedAccount();
+        testMalformedFieldInArray();
+    }
+};
+
+static STParsedJSONTests stParsedJSONTests;
+
+// </ripple-namespace>
+};
