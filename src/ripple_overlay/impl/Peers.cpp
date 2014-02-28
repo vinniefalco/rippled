@@ -142,10 +142,11 @@ public:
 
     PeersImp (Stoppable& parent,
         Resource::Manager& resourceManager,
-            SiteFiles::Manager& siteFiles,
-                Resolver& resolver,
-                    boost::asio::io_service& io_service,
-                        boost::asio::ssl::context& ssl_context)
+        SiteFiles::Manager& siteFiles,
+        File const& pathToDbFileOrDirectory,
+        Resolver& resolver,
+        boost::asio::io_service& io_service,
+        boost::asio::ssl::context& ssl_context)
         : Peers (parent)
         , m_child_count (1)
         , m_journal (LogPartition::getJournal <PeersLog> ())
@@ -153,6 +154,7 @@ public:
         , m_peerFinder (add (PeerFinder::Manager::New (
             *this,
             siteFiles,
+            pathToDbFileOrDirectory,
             *this,
             get_seconds_clock (),
             LogPartition::getJournal <PeerFinderLog> ())))
@@ -579,7 +581,7 @@ public:
         PeerByShortId::iterator const iter (
             m_shortIdMap.find (id));
         if (iter != m_shortIdMap.end ())
-            iter->second;
+            return iter->second;
         return Peer::pointer();
     }
 };
@@ -590,15 +592,17 @@ Peers::~Peers ()
 {
 }
 
-Peers* Peers::New (Stoppable& parent,
+Peers* Peers::New (
+    Stoppable& parent,
     Resource::Manager& resourceManager,
-        SiteFiles::Manager& siteFiles,
-            Resolver& resolver,
-                boost::asio::io_service& io_service,
-                    boost::asio::ssl::context& ssl_context)
+    SiteFiles::Manager& siteFiles,
+    File const& pathToDbFileOrDirectory, 
+    Resolver& resolver,
+    boost::asio::io_service& io_service,
+    boost::asio::ssl::context& ssl_context)
 {
     return new PeersImp (parent, resourceManager, siteFiles, 
-        resolver, io_service, ssl_context);
+        pathToDbFileOrDirectory, resolver, io_service, ssl_context);
 }
 
 }
