@@ -401,8 +401,32 @@ public:
 
         m_peerFinder->setConfig (config);
 
-        // Add the static IPs from the rippled.cfg file
-        m_peerFinder->addFallbackStrings ("rippled.cfg", getConfig().IPS);
+        if (!getConfig ().IPS.empty ())
+        {
+            struct resolve_peers
+            {
+                PeerFinder::Manager* m_peerFinder;
+
+                resolve_peers (PeerFinder::Manager* peerFinder)
+                    : m_peerFinder (peerFinder)
+                { }
+
+                void operator()(std::string const& name,
+                    std::vector <IP::Endpoint> const& addresses)
+                {
+                    std::vector <std::string> ips;
+
+                    for (auto const& addr : addresses)
+                        ips.push_back (to_string (addr));
+
+                    if (!ips.empty ())
+                        m_peerFinder->addFallbackStrings ("rippled.cfg", ips);
+                }
+            };
+
+            m_resolver.resolve (getConfig ().IPS,
+                resolve_peers (m_peerFinder.get ()));
+        }
 
         // Add the ips_fixed from the rippled.cfg file
         if (! getConfig ().RUN_STANDALONE && !getConfig ().IPS_FIXED.empty ())
@@ -416,10 +440,10 @@ public:
                 { }
 
                 void operator()(std::string const& name,
-                    std::vector <IP::Endpoint> const& address)
+                    std::vector <IP::Endpoint> const& addresses)
                 {
-                    if (!address.empty())
-                        m_peerFinder->addFixedPeer (name, address);
+                    if (!addresses.empty ())
+                        m_peerFinder->addFixedPeer (name, addresses);
                 }
             };
 
