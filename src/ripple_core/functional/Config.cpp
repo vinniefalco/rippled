@@ -70,6 +70,7 @@ void parseAddresses (OutputSequence& out, InputIterator first, InputIterator las
 
 Config::Config ()
     : m_rpcPort (5001)
+    , m_moduleDbPath(File::getSpecialLocation (File::userDocumentsDirectory))
 {
     //--------------------------------------------------------------------------
     //
@@ -757,6 +758,14 @@ Config::Role Config::getAdminRole (Json::Value const& params, beast::IP::Endpoin
     }
 
     return role;
+}
+
+//------------------------------------------------------------------------------
+File const& Config::getModuleDatabasePath ()
+{
+    assert (m_moduleDbPath.isDirectory ());
+
+    return m_moduleDbPath;
 }
 
 //
