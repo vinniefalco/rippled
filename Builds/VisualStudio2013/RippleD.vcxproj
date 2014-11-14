@@ -441,6 +441,8 @@
     </ClInclude>
     <ClInclude Include="..\..\src\beast\beast\http\chunk_encode.h">
     </ClInclude>
+    <ClInclude Include="..\..\src\beast\beast\http\client.h">
+    </ClInclude>
     <ClInclude Include="..\..\src\beast\beast\http\headers.h">
     </ClInclude>
     <ClCompile Include="..\..\src\beast\beast\http\HTTP.unity.cpp">
@@ -479,6 +481,9 @@
     <ClInclude Include="..\..\src\beast\beast\http\rfc2616.h">
     </ClInclude>
     <ClCompile Include="..\..\src\beast\beast\http\tests\chunked_encoder.test.cpp">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\..\src\beast\beast\http\tests\client.test.cpp">
       <ExcludedFromBuild>True</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\..\src\beast\beast\http\tests\parser.test.cpp">
