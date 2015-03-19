@@ -29,6 +29,11 @@
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
 
+#include <beast/streams/debug_ostream.h>
+#include <beast/utility/static_initializer.h>
+#include <mutex>
+#include <unordered_map>
+
 namespace ripple {
 
 class STArray;
@@ -38,6 +43,29 @@ class STObject
     , public CountedObject <STObject>
 {
 private:
+    struct Log
+    {
+        std::mutex mutex_;
+        std::unordered_map<
+            std::size_t, std::size_t> map_;
+
+        ~Log()
+        {
+            beast::debug_ostream os;
+            for(auto const& e : map_)
+                os << e.first << "," << e.second;
+        }
+
+        void
+        operator() (std::size_t n)
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            auto const result = map_.emplace(n, 1);
+            if (! result.second)
+                ++result.first->second;
+        }
+    };
+
     using list_type = std::vector<detail::STVar>;
 
     list_type v_;
@@ -82,6 +110,8 @@ public:
             v_.emplace_back(b);
     }
 
+    virtual ~STObject();
+
     std::size_t
     size_of() const override
     {
@@ -112,8 +142,6 @@ public:
     {
         return std::make_unique <STObject> (*this);
     }
-
-    virtual ~STObject() = default;
 
     static std::unique_ptr<STBase>
     deserialize (SerialIter & sit, SField::ref name);

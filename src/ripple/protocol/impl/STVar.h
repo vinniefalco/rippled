@@ -26,10 +26,10 @@
 #include <utility>
 #include <typeinfo>
 
-#include <mutex>
-#include <unordered_map>
 #include <beast/streams/debug_ostream.h>
 #include <beast/utility/static_initializer.h>
+#include <mutex>
+#include <unordered_map>
 
 namespace ripple {
 namespace detail {
