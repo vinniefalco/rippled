@@ -39,7 +39,7 @@ namespace detail {
 class STVar
 {
 private:
-    std::aligned_storage<64>::type d_;
+    std::aligned_storage<72>::type d_;
     STBase* p_ = nullptr;
 
     struct Log
@@ -168,11 +168,14 @@ private:
     void
     destroy()
     {
+    #if 0
+        // Turn this on to get a histogram on exit
         if (p_ != nullptr)
         {
             static beast::static_initializer<Log> log;
             (*log)(p_->size_of());
         }
+    #endif
 
         if (on_heap())
             delete p_;
