@@ -40,6 +40,46 @@ STObject::~STObject()
 #endif
 }
 
+STObject::STObject()
+    : mType (nullptr)
+{
+    v_.reserve(reserveSize);
+}
+
+STObject::STObject (SField::ref name)
+    : STBase (name)
+    , mType (nullptr)
+{
+    v_.reserve(reserveSize);
+}
+
+STObject::STObject (SOTemplate const& type,
+        SField::ref name)
+    : STBase (name)
+{
+    v_.reserve(reserveSize);
+    set (type);
+}
+
+STObject::STObject (SOTemplate const& type,
+        SerialIter & sit, SField::ref name)
+    : STBase (name)
+{
+    v_.reserve(reserveSize);
+    set (sit);
+    setType (type);
+}
+
+STObject::STObject (SField::ref name,
+        boost::ptr_vector<STBase>& data)
+    : STBase (name)
+    , mType (nullptr)
+{
+    v_.reserve(data.size());
+    for (auto const& b : data)
+        v_.emplace_back(b);
+}
+
 std::unique_ptr<STBase>
 STObject::makeDefaultObject (SerializedTypeID id, SField::ref name)
 {

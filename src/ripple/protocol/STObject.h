@@ -43,6 +43,11 @@ class STObject
     , public CountedObject <STObject>
 {
 private:
+    enum
+    {
+        reserveSize = 20
+    };
+
     struct Log
     {
         std::mutex mutex_;
@@ -77,38 +82,17 @@ public:
 
     static char const* getCountedObjectName () { return "STObject"; }
 
-    STObject () : mType (nullptr)
-    {
-        ;
-    }
+    STObject();
 
-    explicit STObject (SField::ref name)
-        : STBase (name), mType (nullptr)
-    {
-        ;
-    }
+    explicit STObject (SField::ref name);
 
-    STObject (const SOTemplate & type, SField::ref name)
-        : STBase (name)
-    {
-        set (type);
-    }
+    STObject (const SOTemplate & type, SField::ref name);
 
-    STObject (
-        const SOTemplate & type, SerialIter & sit, SField::ref name)
-        : STBase (name)
-    {
-        set (sit);
-        setType (type);
-    }
+    STObject (const SOTemplate & type,
+        SerialIter & sit, SField::ref name);
 
-    STObject (SField::ref name, boost::ptr_vector<STBase>& data)
-        : STBase (name), mType (nullptr)
-    {
-        v_.reserve(data.size());
-        for (auto const& b : data)
-            v_.emplace_back(b);
-    }
+    STObject (SField::ref name,
+        boost::ptr_vector<STBase>& data);
 
     virtual ~STObject();
 
