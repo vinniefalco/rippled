@@ -508,25 +508,25 @@ void LedgerEntrySet::calcRawMeta (Serializer& s, TER result, std::uint32_t index
             threadOwners (origNode, mLedger, newMod); // thread transaction to owners
 
             STObject prevs (sfPreviousFields);
-            for (auto const& obj : *origNode)
+            for (auto const& obj : origNode->items())
             {
                 // go through the original node for modified fields saved on modification
                 if (obj.getFName ().shouldMeta (SField::sMD_ChangeOrig) && !curNode->hasMatchingEntry (obj))
                     prevs.addObject (obj);
             }
 
-            if (!prevs.empty ())
+            if (!prevs.items().empty ())
                 mSet.getAffectedNode (it.first).addObject (prevs);
 
             STObject finals (sfFinalFields);
-            for (auto const& obj : *curNode)
+            for (auto const& obj : curNode->items())
             {
                 // go through the final node for final fields
                 if (obj.getFName ().shouldMeta (SField::sMD_Always | SField::sMD_DeleteFinal))
                     finals.addObject (obj);
             }
 
-            if (!finals.empty ())
+            if (!finals.items().empty ())
                 mSet.getAffectedNode (it.first).addObject (finals);
         }
         else if (type == &sfModifiedNode)
@@ -537,25 +537,25 @@ void LedgerEntrySet::calcRawMeta (Serializer& s, TER result, std::uint32_t index
                 threadTx (curNode, mLedger, newMod);
 
             STObject prevs (sfPreviousFields);
-            for (auto const& obj : *origNode)
+            for (auto const& obj : origNode->items())
             {
                 // search the original node for values saved on modify
                 if (obj.getFName ().shouldMeta (SField::sMD_ChangeOrig) && !curNode->hasMatchingEntry (obj))
                     prevs.addObject (obj);
             }
 
-            if (!prevs.empty ())
+            if (!prevs.items().empty ())
                 mSet.getAffectedNode (it.first).addObject (prevs);
 
             STObject finals (sfFinalFields);
-            for (auto const& obj : *curNode)
+            for (auto const& obj : curNode->items())
             {
                 // search the final node for values saved always
                 if (obj.getFName ().shouldMeta (SField::sMD_Always | SField::sMD_ChangeNew))
                     finals.addObject (obj);
             }
 
-            if (!finals.empty ())
+            if (!finals.items().empty ())
                 mSet.getAffectedNode (it.first).addObject (finals);
         }
         else if (type == &sfCreatedNode) // if created, thread to owner(s)
@@ -567,14 +567,14 @@ void LedgerEntrySet::calcRawMeta (Serializer& s, TER result, std::uint32_t index
                 threadTx (curNode, mLedger, newMod);
 
             STObject news (sfNewFields);
-            for (auto const& obj : *curNode)
+            for (auto const& obj : curNode->items())
             {
                 // save non-default values
                 if (!obj.isDefault () && obj.getFName ().shouldMeta (SField::sMD_Create | SField::sMD_Always))
                     news.addObject (obj);
             }
 
-            if (!news.empty ())
+            if (!news.items().empty ())
                 mSet.getAffectedNode (it.first).addObject (news);
         }
         else assert (false);

@@ -52,6 +52,26 @@ public:
     STValidation (uint256 const& ledgerHash, std::uint32_t signTime,
                           const RippleAddress & raPub, bool isFull);
 
+    STBase*
+    copy (std::size_t n, void* buf) const override
+    {
+        if (sizeof(*this) > n)
+            return new std::decay_t<
+                decltype(*this)>(*this);
+        return new(buf) std::decay_t<
+            decltype(*this)>(*this);
+    }
+
+    STBase*
+    move (std::size_t n, void* buf) override
+    {
+        if (sizeof(*this) > n)
+            return new std::decay_t<
+                decltype(*this)>(std::move(*this));
+        return new(buf) std::decay_t<
+            decltype(*this)>(std::move(*this));
+    }
+
     uint256         getLedgerHash ()     const;
     std::uint32_t   getSignTime ()       const;
     std::uint32_t   getFlags ()          const;

@@ -64,6 +64,26 @@ public:
         return std::make_unique<STBitString> (name, sit.getBitString<Bits> ());
     }
 
+    STBase*
+    copy (std::size_t n, void* buf) const override
+    {
+        if (sizeof(*this) > n)
+            return new std::decay_t<
+                decltype(*this)>(*this);
+        return new(buf) std::decay_t<
+            decltype(*this)>(*this);
+    }
+
+    STBase*
+    move (std::size_t n, void* buf) override
+    {
+        if (sizeof(*this) > n)
+            return new std::decay_t<
+                decltype(*this)>(std::move(*this));
+        return new(buf) std::decay_t<
+            decltype(*this)>(std::move(*this));
+    }
+
     SerializedTypeID
     getSType () const override;
 

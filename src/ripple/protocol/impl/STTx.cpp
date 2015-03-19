@@ -125,7 +125,7 @@ STTx::getMentionedAccounts () const
 {
     std::vector<RippleAddress> accounts;
 
-    for (auto const& it : peekData ())
+    for (auto const& it : items())
     {
         if (auto sa = dynamic_cast<STAccount const*> (&it))
         {
@@ -314,7 +314,7 @@ isMemoOkay (STObject const& st, std::string& reason)
             return false;
         }
 
-        for (auto const& memoElement : *memoObj)
+        for (auto const& memoElement : memoObj->items())
         {
             auto const& name = memoElement.getFName();
 

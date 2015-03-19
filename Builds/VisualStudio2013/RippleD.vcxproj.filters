@@ -3546,6 +3546,9 @@
     <ClCompile Include="..\..\src\ripple\protocol\impl\STValidation.cpp">
       <Filter>ripple\protocol\impl</Filter>
     </ClCompile>
+    <ClInclude Include="..\..\src\ripple\protocol\impl\STVar.h">
+      <Filter>ripple\protocol\impl</Filter>
+    </ClInclude>
     <ClCompile Include="..\..\src\ripple\protocol\impl\STVector256.cpp">
       <Filter>ripple\protocol\impl</Filter>
     </ClCompile>

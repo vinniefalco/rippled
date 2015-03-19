@@ -25,6 +25,8 @@
 #include <ripple/protocol/STPathSet.h>
 #include <ripple/protocol/STVector256.h>
 #include <ripple/protocol/SOTemplate.h>
+#include <ripple/protocol/impl/STVar.h>
+#include <boost/iterator/transform_iterator.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
 
 namespace ripple {
@@ -35,7 +37,16 @@ class STObject
     : public STBase
     , public CountedObject <STObject>
 {
+private:
+    using list_type = std::vector<detail::STVar>;
+
+    list_type v_;
+    SOTemplate const* mType;
+
 public:
+    // Read-only iteration 
+    class Items;
+
     static char const* getCountedObjectName () { return "STObject"; }
 
     STObject () : mType (nullptr)
@@ -66,7 +77,29 @@ public:
     STObject (SField::ref name, boost::ptr_vector<STBase>& data)
         : STBase (name), mType (nullptr)
     {
-        mData.swap (data);
+        v_.reserve(data.size());
+        for (auto const& b : data)
+            v_.emplace_back(b);
+    }
+
+    STBase*
+    copy (std::size_t n, void* buf) const override
+    {
+        if (sizeof(*this) > n)
+            return new std::decay_t<
+                decltype(*this)>(*this);
+        return new(buf) std::decay_t<
+            decltype(*this)>(*this);
+    }
+
+    STBase*
+    move (std::size_t n, void* buf) override
+    {
+        if (sizeof(*this) > n)
+            return new std::decay_t<
+                decltype(*this)>(std::move(*this));
+        return new(buf) std::decay_t<
+            decltype(*this)>(std::move(*this));
     }
 
     std::unique_ptr <STObject> oClone () const
@@ -74,7 +107,7 @@ public:
         return std::make_unique <STObject> (*this);
     }
 
-    virtual ~STObject () { }
+    virtual ~STObject() = default;
 
     static std::unique_ptr<STBase>
     deserialize (SerialIter & sit, SField::ref name);
@@ -97,7 +130,7 @@ public:
     virtual bool isEquivalent (const STBase & t) const override;
     virtual bool isDefault () const override
     {
-        return mData.empty ();
+        return v_.empty();
     }
 
     virtual void add (Serializer & s) const override
@@ -125,47 +158,27 @@ public:
 
     int addObject (const STBase & t)
     {
-        mData.push_back (t.duplicate ().release ());
-        return mData.size () - 1;
+        v_.emplace_back(t);
+        return v_.size() - 1;
     }
+
     int giveObject (std::unique_ptr<STBase> t)
     {
-        mData.push_back (t.release ());
-        return mData.size () - 1;
+        v_.emplace_back(std::move(*t));
+        return v_.size() - 1;
     }
+
     int giveObject (STBase * t)
     {
-        mData.push_back (t);
-        return mData.size () - 1;
+        v_.emplace_back(*t);
+        return v_.size () - 1;
     }
-    const boost::ptr_vector<STBase>& peekData () const
-    {
-        return mData;
-    }
-    boost::ptr_vector<STBase>& peekData ()
-    {
-        return mData;
-    }
-    STBase& front ()
-    {
-        return mData.front ();
-    }
-    const STBase& front () const
-    {
-        return mData.front ();
-    }
-    STBase& back ()
-    {
-        return mData.back ();
-    }
-    const STBase& back () const
-    {
-        return mData.back ();
-    }
+
+    Items items() const;
 
     int getCount () const
     {
-        return mData.size ();
+        return v_.size ();
     }
 
     bool setFlag (std::uint32_t);
@@ -178,19 +191,19 @@ public:
 
     const STBase& peekAtIndex (int offset) const
     {
-        return mData[offset];
+        return getnth(offset);
     }
-    STBase& getIndex (int offset)
+    STBase& getIndex(int offset)
     {
-        return mData[offset];
+        return getnth(offset);
     }
     const STBase* peekAtPIndex (int offset) const
     {
-        return & (mData[offset]);
+        return &getnth(offset);
     }
     STBase* getPIndex (int offset)
     {
-        return & (mData[offset]);
+        return &getnth(offset);
     }
 
     int getFieldIndex (SField::ref field) const;
@@ -289,30 +302,6 @@ public:
     static std::unique_ptr<STBase> makeDefaultObject (SField::ref name)
     {
         return makeDefaultObject (name.fieldType, name);
-    }
-
-    // field iterator stuff
-    typedef boost::ptr_vector<STBase>::iterator iterator;
-    typedef boost::ptr_vector<STBase>::const_iterator const_iterator;
-    iterator begin ()
-    {
-        return mData.begin ();
-    }
-    iterator end ()
-    {
-        return mData.end ();
-    }
-    const_iterator begin () const
-    {
-        return mData.begin ();
-    }
-    const_iterator end () const
-    {
-        return mData.end ();
-    }
-    bool empty () const
-    {
-        return mData.empty ();
     }
 
     bool hasMatchingEntry (const STBase&);
@@ -427,9 +416,83 @@ private:
     }
 
 private:
-    boost::ptr_vector<STBase> mData;
-    const SOTemplate* mType;
+    void
+    clear()
+    {
+        v_.clear();
+    }
+
+    STBase&
+    getnth (std::size_t i)
+    {
+        return v_[i].get();
+    }
+
+    STBase const&
+    getnth (std::size_t i) const
+    {
+        return v_[i].get();
+    }
 };
+
+//------------------------------------------------------------------------------
+
+class STObject::Items
+{
+private:
+    struct Transform
+    {
+        using argument_type = detail::STVar;
+        using result_type = STBase;
+
+        STBase const&
+        operator() (detail::STVar const& e) const
+        {
+            return e.get();
+        }
+    };
+
+    STObject const& st_;
+
+public:
+    using iterator = boost::transform_iterator<
+        Transform, STObject::list_type::const_iterator,
+            STBase, STBase>;
+
+    Items() = delete;
+    Items (Items const&) = default;
+    Items& operator= (Items const&) = delete;
+
+    Items (STObject const& st)
+        : st_ (st)
+    {
+    }
+
+    iterator
+    begin() const
+    {
+        return iterator(st_.v_.begin());
+    }
+
+    iterator
+    end() const
+    {
+        return iterator(st_.v_.end());
+    }
+
+    bool
+    empty() const
+    {
+        return st_.v_.empty();
+    }
+};
+
+inline
+STObject::Items
+STObject::items() const
+{
+    return STObject::Items(*this);
+}
 
 } // ripple
 
