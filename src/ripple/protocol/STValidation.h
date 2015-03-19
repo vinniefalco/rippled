@@ -52,6 +52,12 @@ public:
     STValidation (uint256 const& ledgerHash, std::uint32_t signTime,
                           const RippleAddress & raPub, bool isFull);
 
+    std::size_t
+    size_of() const override
+    {
+        return sizeof(*this);
+    }
+
     STBase*
     copy (std::size_t n, void* buf) const override
     {

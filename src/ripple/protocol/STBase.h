@@ -72,6 +72,13 @@ public:
     bool operator!= (const STBase& t) const;
 
     virtual
+    std::size_t
+    size_of() const
+    {
+        return sizeof(*this);
+    }
+
+    virtual
     STBase*
     copy (std::size_t n, void* buf) const
     {

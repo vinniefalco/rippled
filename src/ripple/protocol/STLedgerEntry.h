@@ -41,6 +41,12 @@ public:
     STLedgerEntry (LedgerEntryType type, uint256 const& index);
     STLedgerEntry (const STObject & object, uint256 const& index);
 
+    std::size_t
+    size_of() const override
+    {
+        return sizeof(*this);
+    }
+
     STBase*
     copy (std::size_t n, void* buf) const override
     {

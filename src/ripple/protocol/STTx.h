@@ -56,6 +56,12 @@ public:
     // Only called from ripple::RPC::transactionSign - can we eliminate this?
     explicit STTx (STObject const& object);
 
+    std::size_t
+    size_of() const override
+    {
+        return sizeof(*this);
+    }
+
     STBase*
     copy (std::size_t n, void* buf) const override
     {

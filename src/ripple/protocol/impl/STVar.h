@@ -25,7 +25,11 @@
 #include <cstdint>
 #include <utility>
 #include <typeinfo>
-#include <vector>
+
+#include <mutex>
+#include <unordered_map>
+#include <beast/streams/debug_ostream.h>
+#include <beast/utility/static_initializer.h>
 
 namespace ripple {
 namespace detail {
@@ -37,6 +41,29 @@ class STVar
 private:
     std::aligned_storage<64>::type d_;
     STBase* p_ = nullptr;
+
+    struct Log
+    {
+        std::mutex mutex_;
+        std::unordered_map<
+            std::size_t, std::size_t> map_;
+
+        ~Log()
+        {
+            beast::debug_ostream os;
+            for(auto const& e : map_)
+                os << e.first << "," << e.second;
+        }
+
+        void
+        operator() (std::size_t n)
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            auto const result = map_.emplace(n, 1);
+            if (! result.second)
+                ++result.first->second;
+        }
+    };
 
 public:
     ~STVar()
@@ -141,6 +168,12 @@ private:
     void
     destroy()
     {
+        if (p_ != nullptr)
+        {
+            static beast::static_initializer<Log> log;
+            (*log)(p_->size_of());
+        }
+
         if (on_heap())
             delete p_;
         else
