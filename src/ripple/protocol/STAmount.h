@@ -38,7 +38,7 @@ namespace ripple {
 // Wire form:
 // High 8 bits are (offset+142), legal range is, 80 to 22 inclusive
 // Low 56 bits are value, legal range is 10^15 to (10^16 - 1) inclusive
-class STAmount final
+class STAmount
     : public STBase
 {
 public:
@@ -103,6 +103,32 @@ public:
     STAmount (Issue const& issue, std::int64_t mantissa, int exponent = 0);
 
     STAmount (Issue const& issue, int mantissa, int exponent = 0);
+
+    std::size_t
+    size_of() const override
+    {
+        return sizeof(*this);
+    }
+
+    STBase*
+    copy (std::size_t n, void* buf) const override
+    {
+        if (sizeof(*this) > n)
+            return new std::decay_t<
+                decltype(*this)>(*this);
+        return new(buf) std::decay_t<
+            decltype(*this)>(*this);
+    }
+
+    STBase*
+    move (std::size_t n, void* buf) override
+    {
+        if (sizeof(*this) > n)
+            return new std::decay_t<
+                decltype(*this)>(std::move(*this));
+        return new(buf) std::decay_t<
+            decltype(*this)>(std::move(*this));
+    }
 
     //--------------------------------------------------------------------------
 

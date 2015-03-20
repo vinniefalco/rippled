@@ -109,7 +109,7 @@ std::vector<RippleAddress> TransactionMetaSet::getAffectedAccounts ()
 
             if (inner)
             {
-                for (auto const& field : inner->peekData ())
+                for (auto const& field : inner->items())
                 {
                     const STAccount* sa = dynamic_cast<const STAccount*> (&field);
 

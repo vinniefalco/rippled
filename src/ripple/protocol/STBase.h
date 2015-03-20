@@ -26,7 +26,8 @@
 #include <beast/cxx14/memory.h> // <memory>
 #include <string>
 #include <typeinfo>
-
+#include <utility>
+#include <beast/cxx14/type_traits.h> // <type_traits>
 namespace ripple {
 
 // VFALCO TODO fix this restriction on copy assignment.
@@ -69,6 +70,35 @@ public:
 
     bool operator== (const STBase& t) const;
     bool operator!= (const STBase& t) const;
+
+    virtual
+    std::size_t
+    size_of() const
+    {
+        return sizeof(*this);
+    }
+
+    virtual
+    STBase*
+    copy (std::size_t n, void* buf) const
+    {
+        if (sizeof(*this) > n)
+            return new std::decay_t<
+                decltype(*this)>(*this);
+        return new(buf) std::decay_t<
+            decltype(*this)>(*this);
+    }
+
+    virtual
+    STBase*
+    move (std::size_t n, void* buf)
+    {
+        if (sizeof(*this) > n)
+            return new std::decay_t<
+                decltype(*this)>(std::move(*this));
+        return new(buf) std::decay_t<
+            decltype(*this)>(std::move(*this));
+    }
 
     template <class D>
     D&

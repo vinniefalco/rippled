@@ -41,6 +41,32 @@ public:
     STLedgerEntry (LedgerEntryType type, uint256 const& index);
     STLedgerEntry (const STObject & object, uint256 const& index);
 
+    std::size_t
+    size_of() const override
+    {
+        return sizeof(*this);
+    }
+
+    STBase*
+    copy (std::size_t n, void* buf) const override
+    {
+        if (sizeof(*this) > n)
+            return new std::decay_t<
+                decltype(*this)>(*this);
+        return new(buf) std::decay_t<
+            decltype(*this)>(*this);
+    }
+
+    STBase*
+    move (std::size_t n, void* buf) override
+    {
+        if (sizeof(*this) > n)
+            return new std::decay_t<
+                decltype(*this)>(std::move(*this));
+        return new(buf) std::decay_t<
+            decltype(*this)>(std::move(*this));
+    }
+
     SerializedTypeID getSType () const override
     {
         return STI_LEDGERENTRY;
