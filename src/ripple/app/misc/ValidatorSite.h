@@ -23,6 +23,7 @@
 #include <ripple/app/misc/detail/Work.h>
 #include <ripple/app/misc/Manifest.h>
 #include <ripple/app/misc/ValidatorList.h>
+#include <ripple/app/misc/QuorumFinder.h>
 #include <ripple/basics/Log.h>
 #include <ripple/basics/StringUtilities.h>
 #include <ripple/basics/UnorderedContainers.h>
@@ -84,6 +85,8 @@ private:
     beast::Journal j_;
     std::mutex mutable sites_mutex_;
     std::mutex mutable state_mutex_;
+
+    QuorumFinder qf_;
 
     std::condition_variable cv_;
     std::weak_ptr<detail::Work> work_;

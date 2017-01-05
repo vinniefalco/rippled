@@ -35,6 +35,7 @@ ValidatorSite::ValidatorSite (
     beast::Journal j)
     : app_ (app)
     , j_ (j)
+    , qf_(app.logs().journal("QuorumFinder"))
     , timer_ (app_.getIOService())
     , fetching_ (false)
     , pending_ (false)

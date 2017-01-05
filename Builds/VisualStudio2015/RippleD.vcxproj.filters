@@ -1044,9 +1044,6 @@
     <ClInclude Include="..\..\src\lua\ltm.h">
       <Filter>lua</Filter>
     </ClInclude>
-    <ClCompile Include="..\..\src\lua\lua.c">
-      <Filter>lua</Filter>
-    </ClCompile>
     <ClInclude Include="..\..\src\lua\lua.h">
       <Filter>lua</Filter>
     </ClInclude>
