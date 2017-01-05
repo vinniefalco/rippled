@@ -796,11 +796,12 @@ base.Append(CPPPATH=[
     os.path.join('src', 'beast'),
     os.path.join('src', 'beast', 'include'),
     os.path.join('src', 'beast', 'extras'),
+    os.path.join('src', 'lua'),
     os.path.join('src', 'nudb', 'include'),
-    os.path.join(build_dir, 'proto'),
     os.path.join('src', 'selene', 'include'),
     os.path.join('src','soci','src'),
     os.path.join('src','soci','include'),
+    os.path.join(build_dir, 'proto'),
     ])
 
 base.Decider('MD5-timestamp')
