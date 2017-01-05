@@ -27,6 +27,7 @@
 #include <ripple/protocol/PublicKey.h>
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/range/adaptors.hpp>
+#include <boost/thread/locks.hpp>
 #include <boost/thread/shared_mutex.hpp>
 #include <mutex>
 #include <numeric>
