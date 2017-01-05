@@ -501,6 +501,161 @@
     </ClInclude>
     <ClInclude Include="..\..\src\ed25519-donna\modm-donna-64bit.h">
     </ClInclude>
+    <ClCompile Include="..\..\src\lua\lapi.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClInclude Include="..\..\src\lua\lapi.h">
+    </ClInclude>
+    <ClCompile Include="..\..\src\lua\lauxlib.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClInclude Include="..\..\src\lua\lauxlib.h">
+    </ClInclude>
+    <ClCompile Include="..\..\src\lua\lbaselib.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\..\src\lua\lbitlib.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\..\src\lua\lcode.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClInclude Include="..\..\src\lua\lcode.h">
+    </ClInclude>
+    <ClCompile Include="..\..\src\lua\lcorolib.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\..\src\lua\lctype.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClInclude Include="..\..\src\lua\lctype.h">
+    </ClInclude>
+    <ClCompile Include="..\..\src\lua\ldblib.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\..\src\lua\ldebug.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClInclude Include="..\..\src\lua\ldebug.h">
+    </ClInclude>
+    <ClCompile Include="..\..\src\lua\ldo.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClInclude Include="..\..\src\lua\ldo.h">
+    </ClInclude>
+    <ClCompile Include="..\..\src\lua\ldump.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\..\src\lua\lfunc.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClInclude Include="..\..\src\lua\lfunc.h">
+    </ClInclude>
+    <ClCompile Include="..\..\src\lua\lgc.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClInclude Include="..\..\src\lua\lgc.h">
+    </ClInclude>
+    <ClCompile Include="..\..\src\lua\linit.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\..\src\lua\liolib.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\..\src\lua\llex.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClInclude Include="..\..\src\lua\llex.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\lua\llimits.h">
+    </ClInclude>
+    <ClCompile Include="..\..\src\lua\lmathlib.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\..\src\lua\lmem.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClInclude Include="..\..\src\lua\lmem.h">
+    </ClInclude>
+    <ClCompile Include="..\..\src\lua\loadlib.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\..\src\lua\lobject.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClInclude Include="..\..\src\lua\lobject.h">
+    </ClInclude>
+    <ClCompile Include="..\..\src\lua\lopcodes.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClInclude Include="..\..\src\lua\lopcodes.h">
+    </ClInclude>
+    <ClCompile Include="..\..\src\lua\loslib.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\..\src\lua\lparser.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClInclude Include="..\..\src\lua\lparser.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\lua\lprefix.h">
+    </ClInclude>
+    <ClCompile Include="..\..\src\lua\lstate.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClInclude Include="..\..\src\lua\lstate.h">
+    </ClInclude>
+    <ClCompile Include="..\..\src\lua\lstring.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClInclude Include="..\..\src\lua\lstring.h">
+    </ClInclude>
+    <ClCompile Include="..\..\src\lua\lstrlib.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\..\src\lua\ltable.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClInclude Include="..\..\src\lua\ltable.h">
+    </ClInclude>
+    <ClCompile Include="..\..\src\lua\ltablib.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\..\src\lua\ltests.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\..\src\lua\ltm.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClInclude Include="..\..\src\lua\ltm.h">
+    </ClInclude>
+    <ClCompile Include="..\..\src\lua\lua.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClInclude Include="..\..\src\lua\lua.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\lua\luaconf.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\lua\lualib.h">
+    </ClInclude>
+    <ClCompile Include="..\..\src\lua\lundump.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClInclude Include="..\..\src\lua\lundump.h">
+    </ClInclude>
+    <ClCompile Include="..\..\src\lua\lutf8lib.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\..\src\lua\lvm.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClInclude Include="..\..\src\lua\lvm.h">
+    </ClInclude>
+    <ClCompile Include="..\..\src\lua\lzio.c">
+      <ExcludedFromBuild>True</ExcludedFromBuild>
+    </ClCompile>
+    <ClInclude Include="..\..\src\lua\lzio.h">
+    </ClInclude>
     <ClCompile Include="..\..\src\lz4\lib\lz4.c">
       <ExcludedFromBuild>True</ExcludedFromBuild>
     </ClCompile>
@@ -3179,6 +3334,8 @@
     <ClCompile Include="..\..\src\ripple\unity\ledger.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='debug.classic|x64'">True</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='release.classic|x64'">True</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\..\src\ripple\unity\lua.c">
     </ClCompile>
     <ClCompile Include="..\..\src\ripple\unity\lz4.c">
     </ClCompile>

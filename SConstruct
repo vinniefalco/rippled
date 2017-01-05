@@ -1181,6 +1181,11 @@ for tu_style in ['classic', 'unity']:
             )
 
             object_builder.add_source_files(
+                'src/ripple/unity/lua.c',
+                **cc_flags
+            )
+
+            object_builder.add_source_files(
                 'src/ripple/unity/rocksdb.cpp',
                 CPPPATH=[
                     'src/rocksdb2',
