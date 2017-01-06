@@ -1219,6 +1219,8 @@
     </ClInclude>
     <ClInclude Include="..\..\src\ripple\app\misc\OrderBook.h">
     </ClInclude>
+    <ClInclude Include="..\..\src\ripple\app\misc\QuorumFinder.h">
+    </ClInclude>
     <ClInclude Include="..\..\src\ripple\app\misc\SHAMapStore.h">
     </ClInclude>
     <ClCompile Include="..\..\src\ripple\app\misc\SHAMapStoreImp.cpp">
@@ -4066,6 +4068,52 @@
       <ExcludedFromBuild>True</ExcludedFromBuild>
     </ClCompile>
     <ClInclude Include="..\..\src\secp256k1\src\util.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\selene\include\selene.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\selene\include\selene\BaseFun.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\selene\include\selene\Class.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\selene\include\selene\ClassFun.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\selene\include\selene\Ctor.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\selene\include\selene\Dtor.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\selene\include\selene\ExceptionHandler.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\selene\include\selene\ExceptionTypes.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\selene\include\selene\Fun.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\selene\include\selene\function.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\selene\include\selene\LuaRef.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\selene\include\selene\MetatableRegistry.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\selene\include\selene\Obj.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\selene\include\selene\ObjFun.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\selene\include\selene\primitives.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\selene\include\selene\references.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\selene\include\selene\Registry.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\selene\include\selene\ResourceHandler.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\selene\include\selene\Selector.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\selene\include\selene\State.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\selene\include\selene\traits.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\selene\include\selene\Tuple.h">
+    </ClInclude>
+    <ClInclude Include="..\..\src\selene\include\selene\util.h">
     </ClInclude>
     <ClInclude Include="..\..\src\snappy\config\snappy-stubs-public.h">
     </ClInclude>

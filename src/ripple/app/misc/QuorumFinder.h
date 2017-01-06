@@ -21,6 +21,7 @@
 #define RIPPLE_APP_QUORUMFINDER_H_INCLUDED
 
 #include <ripple/beast/utility/Journal.h>
+#include <ripple/json/json_value.h>
 #include <beast/unit_test/dstream.hpp>
 #include <selene.h>
 
@@ -32,6 +33,27 @@ class QuorumFinder
     sel::State ss_;
 
 public:
+    static
+    Json::Value
+    makeAttestation()
+    {
+        Json::Value jv;
+        jv["sequence"] = 1;
+        auto& ja = jv["validators"];
+        for(int i = 1; i <= 3; ++i)
+        {
+            auto& v = ja.append(Json::objectValue);
+            v["validation_public_key"] = "vpk" + std::to_string(i);;
+            switch(i)
+            {
+            default:
+            case 1: v["jurisdiction"] = "usa"; break;
+            case 2: v["jurisdiction"] = "china"; break;
+            case 3: v["jurisdiction"] = "eu"; break;
+            }
+        }
+    }
+
     explicit
     QuorumFinder(beast::Journal j)
         : j_(j)
@@ -48,6 +70,12 @@ public:
             };
 
         ss_.Load("D:\\policy.lua");
+
+    }
+
+    void
+    onAttestation(Json::Value const& jv)
+    {
     }
 };
 
