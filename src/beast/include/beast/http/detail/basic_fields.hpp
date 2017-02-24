@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2013-2016 Vinnie Falco (vinnie dot falco at gmail dot com)
+// Copyright (c) 2013-2017 Vinnie Falco (vinnie dot falco at gmail dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -94,11 +94,11 @@ protected:
         }
     };
 
-    using list_t = typename boost::intrusive::make_list<
-        element, boost::intrusive::constant_time_size<false>>::type;
+    using list_t = boost::intrusive::make_list<element,
+        boost::intrusive::constant_time_size<false>>::type;
 
-    using set_t = typename boost::intrusive::make_multiset<
-        element, boost::intrusive::constant_time_size<true>,
+    using set_t = boost::intrusive::make_multiset<element,
+        boost::intrusive::constant_time_size<true>,
             boost::intrusive::compare<less>>::type;
 
     // data

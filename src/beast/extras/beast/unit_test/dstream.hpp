@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2013-2016 Vinnie Falco (vinnie dot falco at gmail dot com)
+// Copyright (c) 2013-2017 Vinnie Falco (vinnie dot falco at gmail dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -111,7 +111,7 @@ public:
         : std::basic_ostream<CharT, Traits>(&buf_)
         , buf_(os)
     {
-        if(os.flags() && std::ios::unitbuf)
+        if(os.flags() & std::ios::unitbuf)
             std::unitbuf(*this);
     }
 };

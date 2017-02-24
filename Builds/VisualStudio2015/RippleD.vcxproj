@@ -266,8 +266,6 @@
     </ClInclude>
     <ClInclude Include="..\..\src\beast\include\beast\core\async_completion.hpp">
     </ClInclude>
-    <ClInclude Include="..\..\src\beast\include\beast\core\basic_streambuf.hpp">
-    </ClInclude>
     <ClInclude Include="..\..\src\beast\include\beast\core\bind_handler.hpp">
     </ClInclude>
     <ClInclude Include="..\..\src\beast\include\beast\core\buffer_cat.hpp">
@@ -320,8 +318,6 @@
     </ClInclude>
     <ClInclude Include="..\..\src\beast\include\beast\core\handler_ptr.hpp">
     </ClInclude>
-    <None Include="..\..\src\beast\include\beast\core\impl\basic_streambuf.ipp">
-    </None>
     <None Include="..\..\src\beast\include\beast\core\impl\consuming_buffers.ipp">
     </None>
     <None Include="..\..\src\beast\include\beast\core\impl\dynabuf_readstream.ipp">
@@ -329,6 +325,8 @@
     <None Include="..\..\src\beast\include\beast\core\impl\handler_ptr.ipp">
     </None>
     <None Include="..\..\src\beast\include\beast\core\impl\static_streambuf.ipp">
+    </None>
+    <None Include="..\..\src\beast\include\beast\core\impl\streambuf.ipp">
     </None>
     <ClInclude Include="..\..\src\beast\include\beast\core\placeholders.hpp">
     </ClInclude>
@@ -428,6 +426,8 @@
     </ClInclude>
     <ClInclude Include="..\..\src\beast\include\beast\websocket\detail\mask.hpp">
     </ClInclude>
+    <ClInclude Include="..\..\src\beast\include\beast\websocket\detail\pmd_extension.hpp">
+    </ClInclude>
     <ClInclude Include="..\..\src\beast\include\beast\websocket\detail\stream_base.hpp">
     </ClInclude>
     <ClInclude Include="..\..\src\beast\include\beast\websocket\detail\utf8_checker.hpp">
@@ -463,6 +463,26 @@
     <ClInclude Include="..\..\src\beast\include\beast\websocket\stream.hpp">
     </ClInclude>
     <ClInclude Include="..\..\src\beast\include\beast\websocket\teardown.hpp">
+    </ClInclude>
+    <ClInclude Include="..\..\src\beast\include\beast\zlib\deflate_stream.hpp">
+    </ClInclude>
+    <ClInclude Include="..\..\src\beast\include\beast\zlib\detail\bitstream.hpp">
+    </ClInclude>
+    <ClInclude Include="..\..\src\beast\include\beast\zlib\detail\deflate_stream.hpp">
+    </ClInclude>
+    <ClInclude Include="..\..\src\beast\include\beast\zlib\detail\inflate_stream.hpp">
+    </ClInclude>
+    <ClInclude Include="..\..\src\beast\include\beast\zlib\detail\ranges.hpp">
+    </ClInclude>
+    <ClInclude Include="..\..\src\beast\include\beast\zlib\detail\window.hpp">
+    </ClInclude>
+    <ClInclude Include="..\..\src\beast\include\beast\zlib\error.hpp">
+    </ClInclude>
+    <None Include="..\..\src\beast\include\beast\zlib\impl\error.ipp">
+    </None>
+    <ClInclude Include="..\..\src\beast\include\beast\zlib\inflate_stream.hpp">
+    </ClInclude>
+    <ClInclude Include="..\..\src\beast\include\beast\zlib\zlib.hpp">
     </ClInclude>
     <ClInclude Include="..\..\src\ed25519-donna\curve25519-donna-32bit.h">
     </ClInclude>
