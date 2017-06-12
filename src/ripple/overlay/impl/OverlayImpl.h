@@ -248,6 +248,32 @@ public:
     bool
     isPeerUpgrade (http_request_type const& request);
 
+    template<class Fields>
+    static
+    bool
+    is_upgrade (beast::http::header<true, Fields> const& req)
+    {
+        if(req.version < 11)
+            return false;
+        if(req.method() != beast::http::verb::get)
+            return false;
+        if(! beast::http::token_list{req["Connection"]}.exists("upgrade"))
+            return false;
+        return true;
+    }
+
+    template<class Fields>
+    static
+    bool
+    is_upgrade (beast::http::header<false, Fields> const& req)
+    {
+        if(req.version < 11)
+            return false;
+        if(! beast::http::token_list{req["Connection"]}.exists("upgrade"))
+            return false;
+        return true;
+    }
+
     template<class Body>
     static
     bool
