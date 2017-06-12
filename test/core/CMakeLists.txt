@@ -1,44 +1,43 @@
 # Part of Beast
 
+GroupSources(examples examples)
 GroupSources(extras/beast extras)
 GroupSources(include/beast beast)
 GroupSources(test/core "/")
 
 add_executable (core-tests
     ${BEAST_INCLUDES}
+    ${EXAMPLES_INCLUDES}
     ${EXTRAS_INCLUDES}
     ../../extras/beast/unit_test/main.cpp
-    buffer_test.hpp
-    async_completion.cpp
+    async_result.cpp
     bind_handler.cpp
+    buffer_bench.cpp
     buffer_cat.cpp
-    buffer_concepts.cpp
+    buffer_prefix.cpp
+    buffer_test.hpp
+    buffered_read_stream.cpp
     buffers_adapter.cpp
     clamp.cpp
     consuming_buffers.cpp
-    dynabuf_readstream.cpp
+    doc_core_samples.cpp
+    doc_snippets.cpp
+    drain_buffer.cpp
     error.cpp
+    flat_buffer.cpp
     handler_alloc.cpp
-    handler_concepts.cpp
     handler_ptr.cpp
-    placeholders.cpp
-    prepare_buffer.cpp
-    prepare_buffers.cpp
-    static_streambuf.cpp
+    multi_buffer.cpp
+    ostream.cpp
+    read_size.cpp
+    static_buffer.cpp
     static_string.cpp
-    stream_concepts.cpp
-    streambuf.cpp
-    to_string.cpp
-    write_dynabuf.cpp
+    string_param.cpp
+    string_view.cpp
+    type_traits.cpp
     base64.cpp
     empty_base_optimization.cpp
-    get_lowest_layer.cpp
-    is_call_possible.cpp
     sha1.cpp
 )
 
-if (NOT WIN32)
-    target_link_libraries(core-tests ${Boost_LIBRARIES} Threads::Threads)
-else()
-    target_link_libraries(core-tests ${Boost_LIBRARIES})
-endif()
+target_link_libraries(core-tests Beast Boost::program_options Boost::filesystem Boost::coroutine Boost::thread Boost::context)

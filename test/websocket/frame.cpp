@@ -35,27 +35,27 @@ class frame_test : public beast::unit_test::suite
 public:
     void testCloseCodes()
     {
-        BEAST_EXPECT(! is_valid(0));
-        BEAST_EXPECT(! is_valid(1));
-        BEAST_EXPECT(! is_valid(999));
-        BEAST_EXPECT(! is_valid(1004));
-        BEAST_EXPECT(! is_valid(1005));
-        BEAST_EXPECT(! is_valid(1006));
-        BEAST_EXPECT(! is_valid(1016));
-        BEAST_EXPECT(! is_valid(2000));
-        BEAST_EXPECT(! is_valid(2999));
-        BEAST_EXPECT(is_valid(1000));
-        BEAST_EXPECT(is_valid(1002));
-        BEAST_EXPECT(is_valid(3000));
-        BEAST_EXPECT(is_valid(4000));
-        BEAST_EXPECT(is_valid(5000));
+        BEAST_EXPECT(! is_valid_close_code(0));
+        BEAST_EXPECT(! is_valid_close_code(1));
+        BEAST_EXPECT(! is_valid_close_code(999));
+        BEAST_EXPECT(! is_valid_close_code(1004));
+        BEAST_EXPECT(! is_valid_close_code(1005));
+        BEAST_EXPECT(! is_valid_close_code(1006));
+        BEAST_EXPECT(! is_valid_close_code(1016));
+        BEAST_EXPECT(! is_valid_close_code(2000));
+        BEAST_EXPECT(! is_valid_close_code(2999));
+        BEAST_EXPECT(is_valid_close_code(1000));
+        BEAST_EXPECT(is_valid_close_code(1002));
+        BEAST_EXPECT(is_valid_close_code(3000));
+        BEAST_EXPECT(is_valid_close_code(4000));
+        BEAST_EXPECT(is_valid_close_code(5000));
     }
 
     struct test_fh : frame_header
     {
         test_fh()
         {
-            op = opcode::text;
+            op = detail::opcode::text;
             fin = false;
             mask = false;
             rsv1 = false;
@@ -75,22 +75,22 @@ public:
             auto check =
                 [&](frame_header const& fh)
                 {
-                    fh_streambuf sb;
-                    write(sb, fh);
-                    close_code::value code;
+                    fh_streambuf b;
+                    write(b, fh);
+                    close_code code;
                     stream_base stream;
                     stream.open(role);
                     detail::frame_header fh1;
                     auto const n =
-                        stream.read_fh1(fh1, sb, code);
+                        stream.read_fh1(fh1, b, code);
                     if(! BEAST_EXPECT(! code))
                         return;
-                    if(! BEAST_EXPECT(sb.size() == n))
+                    if(! BEAST_EXPECT(b.size() == n))
                         return;
-                    stream.read_fh2(fh1, sb, code);
+                    stream.read_fh2(fh1, b, code);
                     if(! BEAST_EXPECT(! code))
                         return;
-                    if(! BEAST_EXPECT(sb.size() == 0))
+                    if(! BEAST_EXPECT(b.size() == 0))
                         return;
                     BEAST_EXPECT(fh1 == fh);
                 };
@@ -127,31 +127,31 @@ public:
             auto check =
                 [&](frame_header const& fh)
                 {
-                    fh_streambuf sb;
-                    write(sb, fh);
-                    close_code::value code;
+                    fh_streambuf b;
+                    write(b, fh);
+                    close_code code;
                     stream_base stream;
                     stream.open(role);
                     detail::frame_header fh1;
                     auto const n =
-                        stream.read_fh1(fh1, sb, code);
+                        stream.read_fh1(fh1, b, code);
                     if(code)
                     {
                         pass();
                         return;
                     }
-                    if(! BEAST_EXPECT(sb.size() == n))
+                    if(! BEAST_EXPECT(b.size() == n))
                         return;
-                    stream.read_fh2(fh1, sb, code);
+                    stream.read_fh2(fh1, b, code);
                     if(! BEAST_EXPECT(code))
                         return;
-                    if(! BEAST_EXPECT(sb.size() == 0))
+                    if(! BEAST_EXPECT(b.size() == 0))
                         return;
                 };
 
             test_fh fh;
 
-            fh.op = opcode::close;
+            fh.op = detail::opcode::close;
             fh.fin = true;
             fh.len = 126;
             check(fh);
@@ -169,11 +169,11 @@ public:
             check(fh);
             fh.rsv3 = false;
 
-            fh.op = opcode::rsv3;
+            fh.op = detail::opcode::rsv3;
             check(fh);
-            fh.op = opcode::text;
+            fh.op = detail::opcode::text;
 
-            fh.op = opcode::ping;
+            fh.op = detail::opcode::ping;
             fh.fin = false;
             check(fh);
             fh.fin = true;
@@ -193,25 +193,25 @@ public:
         using boost::asio::buffer_copy;
         static role_type constexpr role = role_type::client;
         std::vector<std::uint8_t> v{bs};
-        fh_streambuf sb;
-        sb.commit(buffer_copy(sb.prepare(v.size()), buffer(v)));
+        fh_streambuf b;
+        b.commit(buffer_copy(b.prepare(v.size()), buffer(v)));
         stream_base stream;
         stream.open(role);
-        close_code::value code;
+        close_code code;
         detail::frame_header fh;
         auto const n =
-            stream.read_fh1(fh, sb, code);
+            stream.read_fh1(fh, b, code);
         if(code)
         {
             pass();
             return;
         }
-        if(! BEAST_EXPECT(sb.size() == n))
+        if(! BEAST_EXPECT(b.size() == n))
             return;
-        stream.read_fh2(fh, sb, code);
+        stream.read_fh2(fh, b, code);
         if(! BEAST_EXPECT(code))
             return;
-        if(! BEAST_EXPECT(sb.size() == 0))
+        if(! BEAST_EXPECT(b.size() == 0))
             return;
     }
 

@@ -5,6 +5,7 @@
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
 
+#include <beast/core.hpp>
 #include <beast/http.hpp>
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
@@ -34,20 +35,20 @@ int main()
     stream.handshake(ssl::stream_base::client);
 
     // Send HTTP request over SSL using Beast
-    beast::http::request<beast::http::empty_body> req;
-    req.method = "GET";
-    req.url = "/";
+    beast::http::request<beast::http::string_body> req;
+    req.method(beast::http::verb::get);
+    req.target("/");
     req.version = 11;
-    req.fields.insert("Host", host + ":" +
+    req.insert(beast::http::field::host, host + ":" +
         boost::lexical_cast<std::string>(sock.remote_endpoint().port()));
-    req.fields.insert("User-Agent", "Beast");
-    beast::http::prepare(req);
+    req.insert(beast::http::field::user_agent, "Beast");
+    req.prepare();
     beast::http::write(stream, req);
 
     // Receive and print HTTP response using Beast
-    beast::streambuf sb;
-    beast::http::response<beast::http::streambuf_body> resp;
-    beast::http::read(stream, sb, resp);
+    beast::flat_buffer b;
+    beast::http::response<beast::http::dynamic_body> resp;
+    beast::http::read(stream, b, resp);
     std::cout << resp;
 
     // Shut down SSL on the stream

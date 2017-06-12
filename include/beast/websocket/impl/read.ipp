@@ -9,15 +9,18 @@
 #define BEAST_WEBSOCKET_IMPL_READ_IPP
 
 #include <beast/websocket/teardown.hpp>
-#include <beast/core/buffer_concepts.hpp>
-#include <beast/core/handler_helpers.hpp>
+#include <beast/core/buffer_prefix.hpp>
 #include <beast/core/handler_ptr.hpp>
-#include <beast/core/prepare_buffers.hpp>
-#include <beast/core/static_streambuf.hpp>
-#include <beast/core/stream_concepts.hpp>
+#include <beast/core/static_buffer.hpp>
+#include <beast/core/type_traits.hpp>
 #include <beast/core/detail/clamp.hpp>
+#include <boost/asio/handler_alloc_hook.hpp>
+#include <boost/asio/handler_continuation_hook.hpp>
+#include <boost/asio/handler_invoke_hook.hpp>
 #include <boost/assert.hpp>
+#include <boost/config.hpp>
 #include <boost/optional.hpp>
+#include <boost/throw_exception.hpp>
 #include <limits>
 #include <memory>
 
@@ -46,7 +49,6 @@ class stream<NextLayer>::read_frame_op
     {
         bool cont;
         stream<NextLayer>& ws;
-        frame_info& fi;
         DynamicBuffer& db;
         fb_type fb;
         std::uint64_t remain;
@@ -57,13 +59,12 @@ class stream<NextLayer>::read_frame_op
         int state = 0;
 
         data(Handler& handler, stream<NextLayer>& ws_,
-                frame_info& fi_, DynamicBuffer& sb_)
-            : cont(beast_asio_helpers::
-                is_continuation(handler))
-            , ws(ws_)
-            , fi(fi_)
+                DynamicBuffer& sb_)
+            : ws(ws_)
             , db(sb_)
         {
+            using boost::asio::asio_handler_is_continuation;
+            cont = asio_handler_is_continuation(std::addressof(handler));
         }
     };
 
@@ -102,16 +103,18 @@ public:
     void* asio_handler_allocate(
         std::size_t size, read_frame_op* op)
     {
-        return beast_asio_helpers::
-            allocate(size, op->d_.handler());
+        using boost::asio::asio_handler_allocate;
+        return asio_handler_allocate(
+            size, std::addressof(op->d_.handler()));
     }
 
     friend
     void asio_handler_deallocate(
         void* p, std::size_t size, read_frame_op* op)
     {
-        return beast_asio_helpers::
-            deallocate(p, size, op->d_.handler());
+        using boost::asio::asio_handler_deallocate;
+        asio_handler_deallocate(
+            p, size, std::addressof(op->d_.handler()));
     }
 
     friend
@@ -124,8 +127,9 @@ public:
     friend
     void asio_handler_invoke(Function&& f, read_frame_op* op)
     {
-        return beast_asio_helpers::
-            invoke(f, op->d_.handler());
+        using boost::asio::asio_handler_invoke;
+        asio_handler_invoke(
+            f, std::addressof(op->d_.handler()));
     }
 };
 
@@ -170,10 +174,16 @@ operator()(error_code ec,
     };
 
     auto& d = *d_;
+    if(d.state == do_teardown + 1 && ec == boost::asio::error::eof)
+    {
+        // Rationale:
+        // http://stackoverflow.com/questions/25587403/boost-asio-ssl-async-shutdown-always-finishes-with-an-error
+        ec = {};
+    }
     if(! ec)
     {
         d.cont = d.cont || again;
-        close_code::value code = close_code::none;
+        close_code code = close_code::none;
         do
         {
             switch(d.state)
@@ -223,11 +233,11 @@ operator()(error_code ec,
             case do_read_payload + 2:
             {
                 d.remain -= bytes_transferred;
-                auto const pb = prepare_buffers(
+                auto const pb = buffer_prefix(
                     bytes_transferred, *d.dmb);
                 if(d.fh.mask)
                     detail::mask_inplace(pb, d.key);
-                if(d.ws.rd_.op == opcode::text)
+                if(d.ws.rd_.op == detail::opcode::text)
                 {
                     if(! d.ws.rd_.utf8.write(pb) ||
                         (d.remain == 0 && d.fh.fin &&
@@ -299,7 +309,7 @@ operator()(error_code ec,
                     if(d.ws.failed_)
                         break;
                 }
-                if(d.ws.rd_.op == opcode::text)
+                if(d.ws.rd_.op == detail::opcode::text)
                 {
                     consuming_buffers<typename
                         DynamicBuffer::const_buffers_type
@@ -333,9 +343,6 @@ operator()(error_code ec,
             //------------------------------------------------------------------
 
             case do_frame_done:
-                // call handler
-                d.fi.op = d.ws.rd_.op;
-                d.fi.fin = d.fh.fin;
                 goto upcall;
 
             //------------------------------------------------------------------
@@ -395,8 +402,8 @@ operator()(error_code ec,
                     d.state = do_control;
                     break;
                 }
-                if(d.fh.op == opcode::text ||
-                        d.fh.op == opcode::binary)
+                if(d.fh.op == detail::opcode::text ||
+                        d.fh.op == detail::opcode::binary)
                     d.ws.rd_begin();
                 if(d.fh.len == 0 && ! d.fh.fin)
                 {
@@ -425,11 +432,11 @@ operator()(error_code ec,
             //------------------------------------------------------------------
 
             case do_control:
-                if(d.fh.op == opcode::ping)
+                if(d.fh.op == detail::opcode::ping)
                 {
                     ping_data payload;
                     detail::read(payload, d.fb.data());
-                    d.fb.reset();
+                    d.fb.consume(d.fb.size());
                     if(d.ws.ping_cb_)
                         d.ws.ping_cb_(false, payload);
                     if(d.ws.wr_close_)
@@ -438,32 +445,31 @@ operator()(error_code ec,
                         d.state = do_read_fh;
                         break;
                     }
-                    d.ws.template write_ping<static_streambuf>(
-                        d.fb, opcode::pong, payload);
+                    d.ws.template write_ping<static_buffer>(
+                        d.fb, detail::opcode::pong, payload);
                     if(d.ws.wr_block_)
                     {
                         // suspend
                         d.state = do_pong_resume;
                         BOOST_ASSERT(d.ws.wr_block_ != &d);
-                        d.ws.rd_op_.template emplace<
-                            read_frame_op>(std::move(*this));
+                        d.ws.rd_op_.emplace(std::move(*this));
                         return;
                     }
                     d.state = do_pong;
                     break;
                 }
-                else if(d.fh.op == opcode::pong)
+                else if(d.fh.op == detail::opcode::pong)
                 {
                     code = close_code::none;
                     ping_data payload;
                     detail::read(payload, d.fb.data());
                     if(d.ws.ping_cb_)
                         d.ws.ping_cb_(true, payload);
-                    d.fb.reset();
+                    d.fb.consume(d.fb.size());
                     d.state = do_read_fh;
                     break;
                 }
-                BOOST_ASSERT(d.fh.op == opcode::close);
+                BOOST_ASSERT(d.fh.op == detail::opcode::close);
                 {
                     detail::read(d.ws.cr_, d.fb.data(), code);
                     if(code != close_code::none)
@@ -478,15 +484,14 @@ operator()(error_code ec,
                         if(cr.code == close_code::none)
                             cr.code = close_code::normal;
                         cr.reason = "";
-                        d.fb.reset();
+                        d.fb.consume(d.fb.size());
                         d.ws.template write_close<
-                            static_streambuf>(d.fb, cr);
+                            static_buffer>(d.fb, cr);
                         if(d.ws.wr_block_)
                         {
                             // suspend
                             d.state = do_close_resume;
-                            d.ws.rd_op_.template emplace<
-                                read_frame_op>(std::move(*this));
+                            d.ws.rd_op_.emplace(std::move(*this));
                             return;
                         }
                         d.state = do_close;
@@ -513,7 +518,7 @@ operator()(error_code ec,
                     ec = boost::asio::error::operation_aborted;
                     goto upcall;
                 }
-                // [[fallthrough]]
+                BOOST_FALLTHROUGH;
 
             //------------------------------------------------------------------
 
@@ -526,7 +531,7 @@ operator()(error_code ec,
                         BOOST_ASSERT(d.ws.wr_block_ == &d);
                         d.ws.wr_block_ = nullptr;
                     }
-                    d.fb.reset();
+                    d.fb.consume(d.fb.size());
                     d.state = do_read_fh;
                     break;
                 }
@@ -541,7 +546,7 @@ operator()(error_code ec,
                 return;
 
             case do_pong + 1:
-                d.fb.reset();
+                d.fb.consume(d.fb.size());
                 d.state = do_read_fh;
                 d.ws.wr_block_ = nullptr;
                 break;
@@ -612,15 +617,14 @@ operator()(error_code ec,
                     d.state = do_fail + 4;
                     break;
                 }
-                d.fb.reset();
+                d.fb.consume(d.fb.size());
                 d.ws.template write_close<
-                    static_streambuf>(d.fb, code);
+                    static_buffer>(d.fb, code);
                 if(d.ws.wr_block_)
                 {
                     // suspend
                     d.state = do_fail + 2;
-                    d.ws.rd_op_.template emplace<
-                        read_frame_op>(std::move(*this));
+                    d.ws.rd_op_.emplace(std::move(*this));
                     return;
                 }
                 // fall through
@@ -675,59 +679,61 @@ upcall:
         d.ws.wr_block_ = nullptr;
     d.ws.ping_op_.maybe_invoke() ||
         d.ws.wr_op_.maybe_invoke();
-    d_.invoke(ec);
+    bool const fin = (! ec) ? d.fh.fin : false;
+    d_.invoke(ec, fin);
 }
 
 template<class NextLayer>
 template<class DynamicBuffer, class ReadHandler>
-typename async_completion<
-    ReadHandler, void(error_code)>::result_type
+async_return_type<
+    ReadHandler, void(error_code, bool)>
 stream<NextLayer>::
-async_read_frame(frame_info& fi,
-    DynamicBuffer& dynabuf, ReadHandler&& handler)
+async_read_frame(DynamicBuffer& buffer, ReadHandler&& handler)
 {
-    static_assert(is_AsyncStream<next_layer_type>::value,
+    static_assert(is_async_stream<next_layer_type>::value,
         "AsyncStream requirements requirements not met");
-    static_assert(beast::is_DynamicBuffer<DynamicBuffer>::value,
+    static_assert(beast::is_dynamic_buffer<DynamicBuffer>::value,
         "DynamicBuffer requirements not met");
-    beast::async_completion<
-        ReadHandler, void(error_code)> completion{handler};
-    read_frame_op<DynamicBuffer, decltype(completion.handler)>{
-        completion.handler, *this, fi, dynabuf};
-    return completion.result.get();
+    async_completion<ReadHandler,
+        void(error_code, bool)> init{handler};
+    read_frame_op<DynamicBuffer, handler_type<
+        ReadHandler, void(error_code, bool)>>{
+            init.completion_handler,*this, buffer};
+    return init.result.get();
 }
 
 template<class NextLayer>
 template<class DynamicBuffer>
-void
+bool
 stream<NextLayer>::
-read_frame(frame_info& fi, DynamicBuffer& dynabuf)
+read_frame(DynamicBuffer& buffer)
 {
-    static_assert(is_SyncStream<next_layer_type>::value,
+    static_assert(is_sync_stream<next_layer_type>::value,
         "SyncStream requirements not met");
-    static_assert(beast::is_DynamicBuffer<DynamicBuffer>::value,
+    static_assert(beast::is_dynamic_buffer<DynamicBuffer>::value,
         "DynamicBuffer requirements not met");
     error_code ec;
-    read_frame(fi, dynabuf, ec);
+    auto const fin = read_frame(buffer, ec);
     if(ec)
-        throw system_error{ec};
+        BOOST_THROW_EXCEPTION(system_error{ec});
+    return fin;
 }
 
 template<class NextLayer>
 template<class DynamicBuffer>
-void
+bool
 stream<NextLayer>::
-read_frame(frame_info& fi, DynamicBuffer& dynabuf, error_code& ec)
+read_frame(DynamicBuffer& dynabuf, error_code& ec)
 {
-    static_assert(is_SyncStream<next_layer_type>::value,
+    static_assert(is_sync_stream<next_layer_type>::value,
         "SyncStream requirements not met");
-    static_assert(beast::is_DynamicBuffer<DynamicBuffer>::value,
+    static_assert(beast::is_dynamic_buffer<DynamicBuffer>::value,
         "DynamicBuffer requirements not met");
     using beast::detail::clamp;
     using boost::asio::buffer;
     using boost::asio::buffer_cast;
     using boost::asio::buffer_size;
-    close_code::value code{};
+    close_code code{};
     for(;;)
     {
         // Read frame header
@@ -738,7 +744,7 @@ read_frame(frame_info& fi, DynamicBuffer& dynabuf, error_code& ec)
                 stream_, fb.prepare(2), ec));
             failed_ = ec != 0;
             if(failed_)
-                return;
+                return false;
             {
                 auto const n = read_fh1(fh, fb, code);
                 if(code != close_code::none)
@@ -749,14 +755,14 @@ read_frame(frame_info& fi, DynamicBuffer& dynabuf, error_code& ec)
                         stream_, fb.prepare(n), ec));
                     failed_ = ec != 0;
                     if(failed_)
-                        return;
+                        return false;
                 }
             }
             read_fh2(fh, fb, code);
 
             failed_ = ec != 0;
             if(failed_)
-                return;
+                return false;
             if(code != close_code::none)
                 goto do_close;
         }
@@ -770,7 +776,7 @@ read_frame(frame_info& fi, DynamicBuffer& dynabuf, error_code& ec)
                 fb.commit(boost::asio::read(stream_, mb, ec));
                 failed_ = ec != 0;
                 if(failed_)
-                    return;
+                    return false;
                 if(fh.mask)
                 {
                     detail::prepared_key key;
@@ -780,22 +786,22 @@ read_frame(frame_info& fi, DynamicBuffer& dynabuf, error_code& ec)
                 fb.commit(static_cast<std::size_t>(fh.len));
             }
             // Process control frame
-            if(fh.op == opcode::ping)
+            if(fh.op == detail::opcode::ping)
             {
                 ping_data payload;
                 detail::read(payload, fb.data());
-                fb.reset();
+                fb.consume(fb.size());
                 if(ping_cb_)
                     ping_cb_(false, payload);
-                write_ping<static_streambuf>(
-                    fb, opcode::pong, payload);
+                write_ping<static_buffer>(fb,
+                    detail::opcode::pong, payload);
                 boost::asio::write(stream_, fb.data(), ec);
                 failed_ = ec != 0;
                 if(failed_)
-                    return;
+                    return false;
                 continue;
             }
-            else if(fh.op == opcode::pong)
+            else if(fh.op == detail::opcode::pong)
             {
                 ping_data payload;
                 detail::read(payload, fb.data());
@@ -803,7 +809,7 @@ read_frame(frame_info& fi, DynamicBuffer& dynabuf, error_code& ec)
                     ping_cb_(true, payload);
                 continue;
             }
-            BOOST_ASSERT(fh.op == opcode::close);
+            BOOST_ASSERT(fh.op == detail::opcode::close);
             {
                 detail::read(cr_, fb.data(), code);
                 if(code != close_code::none)
@@ -814,18 +820,18 @@ read_frame(frame_info& fi, DynamicBuffer& dynabuf, error_code& ec)
                     if(cr.code == close_code::none)
                         cr.code = close_code::normal;
                     cr.reason = "";
-                    fb.reset();
+                    fb.consume(fb.size());
                     wr_close_ = true;
-                    write_close<static_streambuf>(fb, cr);
+                    write_close<static_buffer>(fb, cr);
                     boost::asio::write(stream_, fb.data(), ec);
                     failed_ = ec != 0;
                     if(failed_)
-                        return;
+                        return false;
                 }
                 goto do_close;
             }
         }
-        if(fh.op != opcode::cont)
+        if(fh.op != detail::opcode::cont)
             rd_begin();
         if(fh.len == 0 && ! fh.fin)
         {
@@ -855,14 +861,14 @@ read_frame(frame_info& fi, DynamicBuffer& dynabuf, error_code& ec)
                     stream_.read_some(b, ec);
                 failed_ = ec != 0;
                 if(failed_)
-                    return;
+                    return false;
                 BOOST_ASSERT(bytes_transferred > 0);
                 remain -= bytes_transferred;
-                auto const pb = prepare_buffers(
+                auto const pb = buffer_prefix(
                     bytes_transferred, b);
                 if(fh.mask)
                     detail::mask_inplace(pb, key);
-                if(rd_.op == opcode::text)
+                if(rd_.op == detail::opcode::text)
                 {
                     if(! rd_.utf8.write(pb) ||
                         (remain == 0 && fh.fin &&
@@ -887,7 +893,7 @@ read_frame(frame_info& fi, DynamicBuffer& dynabuf, error_code& ec)
                         clamp(remain, rd_.buf_size)), ec);
                 failed_ = ec != 0;
                 if(failed_)
-                    return;
+                    return false;
                 remain -= bytes_transferred;
                 auto const in = buffer(
                     rd_.buf.get(), bytes_transferred);
@@ -897,7 +903,7 @@ read_frame(frame_info& fi, DynamicBuffer& dynabuf, error_code& ec)
                 detail::inflate(pmd_->zi, dynabuf, in, ec);
                 failed_ = ec != 0;
                 if(failed_)
-                    return;
+                    return false;
                 if(remain == 0 && fh.fin)
                 {
                     static std::uint8_t constexpr
@@ -907,9 +913,9 @@ read_frame(frame_info& fi, DynamicBuffer& dynabuf, error_code& ec)
                         buffer(&empty_block[0], 4), ec);
                     failed_ = ec != 0;
                     if(failed_)
-                        return;
+                        return false;
                 }
-                if(rd_.op == opcode::text)
+                if(rd_.op == detail::opcode::text)
                 {
                     consuming_buffers<typename
                         DynamicBuffer::const_buffers_type
@@ -933,9 +939,7 @@ read_frame(frame_info& fi, DynamicBuffer& dynabuf, error_code& ec)
                     pmd_config_.client_no_context_takeover)))
                 pmd_->zi.reset();
         }
-        fi.op = rd_.op;
-        fi.fin = fh.fin;
-        return;
+        return fh.fin;
     }
 do_close:
     if(code != close_code::none)
@@ -945,25 +949,41 @@ do_close:
         {
             wr_close_ = true;
             detail::frame_streambuf fb;
-            write_close<static_streambuf>(fb, code);
+            write_close<static_buffer>(fb, code);
             boost::asio::write(stream_, fb.data(), ec);
             failed_ = ec != 0;
             if(failed_)
-                return;
+                return false;
         }
         websocket_helpers::call_teardown(next_layer(), ec);
+        if(ec == boost::asio::error::eof)
+        {
+            // Rationale:
+            // http://stackoverflow.com/questions/25587403/boost-asio-ssl-async-shutdown-always-finishes-with-an-error
+            ec = {};
+        }
         failed_ = ec != 0;
         if(failed_)
-            return;
+            return false;
         ec = error::failed;
         failed_ = true;
-        return;
+        return false;
     }
     if(! ec)
+    {
         websocket_helpers::call_teardown(next_layer(), ec);
+        if(ec == boost::asio::error::eof)
+        {
+            // (See above)
+            ec = {};
+        }
+    }
     if(! ec)
         ec = error::closed;
     failed_ = ec != 0;
+    if(failed_)
+        return false;
+    return true;
 }
 
 //------------------------------------------------------------------------------
@@ -974,73 +994,58 @@ template<class NextLayer>
 template<class DynamicBuffer, class Handler>
 class stream<NextLayer>::read_op
 {
-    struct data
-    {
-        bool cont;
-        stream<NextLayer>& ws;
-        opcode& op;
-        DynamicBuffer& db;
-        frame_info fi;
-        int state = 0;
-
-        data(Handler& handler,
-            stream<NextLayer>& ws_, opcode& op_,
-                DynamicBuffer& sb_)
-            : cont(beast_asio_helpers::
-                is_continuation(handler))
-            , ws(ws_)
-            , op(op_)
-            , db(sb_)
-        {
-        }
-    };
-
-    handler_ptr<data, Handler> d_;
+    int state_ = 0;
+    stream<NextLayer>& ws_;
+    DynamicBuffer& b_;
+    Handler h_;
 
 public:
     read_op(read_op&&) = default;
     read_op(read_op const&) = default;
 
-    template<class DeducedHandler, class... Args>
+    template<class DeducedHandler>
     read_op(DeducedHandler&& h,
-            stream<NextLayer>& ws, Args&&... args)
-        : d_(std::forward<DeducedHandler>(h),
-            ws, std::forward<Args>(args)...)
+            stream<NextLayer>& ws, DynamicBuffer& b)
+        : ws_(ws)
+        , b_(b)
+        , h_(std::forward<DeducedHandler>(h))
     {
-        (*this)(error_code{}, false);
     }
 
-    void operator()(
-        error_code const& ec, bool again = true);
+    void operator()(error_code const& ec, bool fin);
 
     friend
     void* asio_handler_allocate(
         std::size_t size, read_op* op)
     {
-        return beast_asio_helpers::
-            allocate(size, op->d_.handler());
+        using boost::asio::asio_handler_allocate;
+        return asio_handler_allocate(
+            size, std::addressof(op->h_));
     }
 
     friend
     void asio_handler_deallocate(
         void* p, std::size_t size, read_op* op)
     {
-        return beast_asio_helpers::
-            deallocate(p, size, op->d_.handler());
+        using boost::asio::asio_handler_deallocate;
+        asio_handler_deallocate(
+            p, size, std::addressof(op->h_));
     }
 
     friend
     bool asio_handler_is_continuation(read_op* op)
     {
-        return op->d_->cont;
+        using boost::asio::asio_handler_is_continuation;
+        return op->state_ >= 2 ? true:
+            asio_handler_is_continuation(std::addressof(op->h_));
     }
 
     template<class Function>
     friend
     void asio_handler_invoke(Function&& f, read_op* op)
     {
-        return beast_asio_helpers::
-            invoke(f, op->d_.handler());
+        using boost::asio::asio_handler_invoke;
+        asio_handler_invoke(f, std::addressof(op->h_));
     }
 };
 
@@ -1048,88 +1053,83 @@ template<class NextLayer>
 template<class DynamicBuffer, class Handler>
 void
 stream<NextLayer>::read_op<DynamicBuffer, Handler>::
-operator()(error_code const& ec, bool again)
+operator()(error_code const& ec, bool fin)
 {
-    auto& d = *d_;
-    d.cont = d.cont || again;
-    while(! ec)
+    switch(state_)
     {
-        switch(d.state)
-        {
-        case 0:
-            // read payload
-            d.state = 1;
-            d.ws.async_read_frame(
-                d.fi, d.db, std::move(*this));
-            return;
+    case 0:
+        state_ = 1;
+        goto do_read;
 
-        // got payload
-        case 1:
-            d.op = d.fi.op;
-            if(d.fi.fin)
-                goto upcall;
-            d.state = 0;
-            break;
-        }
+    case 1:
+        state_ = 2;
+        BOOST_FALLTHROUGH;
+
+    case 2:
+        if(ec)
+            goto upcall;
+        if(fin)
+            goto upcall;
+    do_read:
+        return ws_.async_read_frame(
+            b_, std::move(*this));
     }
 upcall:
-    d_.invoke(ec);
+    h_(ec);
 }
 
 template<class NextLayer>
 template<class DynamicBuffer, class ReadHandler>
-typename async_completion<
-    ReadHandler, void(error_code)>::result_type
+async_return_type<
+    ReadHandler, void(error_code)>
 stream<NextLayer>::
-async_read(opcode& op,
-    DynamicBuffer& dynabuf, ReadHandler&& handler)
+async_read(DynamicBuffer& buffer, ReadHandler&& handler)
 {
-    static_assert(is_AsyncStream<next_layer_type>::value,
+    static_assert(is_async_stream<next_layer_type>::value,
         "AsyncStream requirements requirements not met");
-    static_assert(beast::is_DynamicBuffer<DynamicBuffer>::value,
+    static_assert(beast::is_dynamic_buffer<DynamicBuffer>::value,
         "DynamicBuffer requirements not met");
-    beast::async_completion<
-        ReadHandler, void(error_code)
-            > completion{handler};
-    read_op<DynamicBuffer, decltype(completion.handler)>{
-        completion.handler, *this, op, dynabuf};
-    return completion.result.get();
+    async_completion<ReadHandler,
+        void(error_code)> init{handler};
+    read_op<DynamicBuffer, handler_type<
+        ReadHandler, void(error_code)>>{
+            init.completion_handler, *this, buffer}(
+                {}, false);
+    return init.result.get();
 }
 
 template<class NextLayer>
 template<class DynamicBuffer>
 void
 stream<NextLayer>::
-read(opcode& op, DynamicBuffer& dynabuf)
+read(DynamicBuffer& buffer)
 {
-    static_assert(is_SyncStream<next_layer_type>::value,
+    static_assert(is_sync_stream<next_layer_type>::value,
         "SyncStream requirements not met");
-    static_assert(beast::is_DynamicBuffer<DynamicBuffer>::value,
+    static_assert(beast::is_dynamic_buffer<DynamicBuffer>::value,
         "DynamicBuffer requirements not met");
     error_code ec;
-    read(op, dynabuf, ec);
+    read(buffer, ec);
     if(ec)
-        throw system_error{ec};
+        BOOST_THROW_EXCEPTION(system_error{ec});
 }
 
 template<class NextLayer>
 template<class DynamicBuffer>
 void
 stream<NextLayer>::
-read(opcode& op, DynamicBuffer& dynabuf, error_code& ec)
+read(DynamicBuffer& buffer, error_code& ec)
 {
-    static_assert(is_SyncStream<next_layer_type>::value,
+    static_assert(is_sync_stream<next_layer_type>::value,
         "SyncStream requirements not met");
-    static_assert(beast::is_DynamicBuffer<DynamicBuffer>::value,
+    static_assert(beast::is_dynamic_buffer<DynamicBuffer>::value,
         "DynamicBuffer requirements not met");
-    frame_info fi;
     for(;;)
     {
-        read_frame(fi, dynabuf, ec);
+        auto const fin = read_frame(buffer, ec);
         if(ec)
             break;
-        op = fi.op;
-        if(fi.fin)
+        if(fin)
             break;
     }
 }

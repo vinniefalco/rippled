@@ -61,6 +61,22 @@
 
 <!--========== Utilities ==========-->
 
+<!-- 4 spaces used for indentation -->
+<xsl:variable name="tabspaces">
+<xsl:text>    </xsl:text>
+</xsl:variable>
+
+<!-- Indent the current line with count number of tabspaces -->
+<xsl:template name="indent">
+  <xsl:param name="count"/>
+  <xsl:if test="$count &gt; 0">
+    <xsl:value-of select="$tabspaces"/>
+    <xsl:call-template name="indent">
+      <xsl:with-param name="count" select="$count - 1"/>
+    </xsl:call-template>
+  </xsl:if>
+</xsl:template>
+
 <xsl:template name="strip-beast-ns">
   <xsl:param name="name"/>
   <xsl:choose>
@@ -394,13 +410,34 @@
   <xsl:text>`</xsl:text>
 </xsl:template>
 
+<!-- Ensure the list starts on its own line -->
+<xsl:template match="orderedlist | itemizedlist" mode="markup">
+  <xsl:value-of select="$newline" />
+  <xsl:apply-templates mode="markup"/>
+  <xsl:value-of select="$newline" />
+</xsl:template>
+
+<!-- Properly format a list item to ensure proper nesting and styling -->
 <xsl:template match="listitem" mode="markup">
-  <xsl:text>* </xsl:text>
-  <xsl:call-template name="strip-leading-whitespace">
-    <xsl:with-param name="text">
-      <xsl:apply-templates mode="markup"/>
-    </xsl:with-param>
+  <!-- The first listitem in a group was put on a newline by the
+       rule above, so only indent the later siblings -->
+  <xsl:if test="position() &gt; 1">
+    <xsl:value-of select="$newline" />
+  </xsl:if>
+  <!-- Indent the listitem based on the list nesting level -->
+  <xsl:call-template name="indent">
+     <xsl:with-param name="count" select="count(ancestor::orderedlist | ancestor::itemizedlist )-1" />
   </xsl:call-template>
+  <xsl:if test="parent::orderedlist">
+    <xsl:text># </xsl:text>
+  </xsl:if>
+  <xsl:if test="parent::itemizedlist">
+    <xsl:text>* </xsl:text>
+  </xsl:if>
+  <!-- Doxygen injects a <para></para> element around the listitem contents
+       so this rule extracts the contents and formats that directly to avoid
+       introducing extra newlines from formating para -->
+  <xsl:apply-templates select="para/node()" mode="markup"/>
 </xsl:template>
 
 <xsl:template match="bold" mode="markup">[*<xsl:apply-templates mode="markup"/>]</xsl:template>
@@ -427,6 +464,25 @@
   <xsl:text>][&#xd;    </xsl:text>
   <xsl:apply-templates select="parameterdescription" mode="markup-nested"/>
   <xsl:text>&#xd;  ]]&#xd;</xsl:text>
+</xsl:template>
+
+<!-- Table support -->
+<xsl:template match="table" mode="markup">
+   <xsl:text>&#xd;[table  &#xd;</xsl:text>
+   <xsl:apply-templates mode="markup"/>
+   <xsl:text>]&#xd;</xsl:text>
+</xsl:template>
+
+<xsl:template match="row" mode="markup">
+   <xsl:text>    [</xsl:text>
+   <xsl:apply-templates mode="markup"/>
+   <xsl:text>]&#xd;</xsl:text>
+</xsl:template>
+
+<xsl:template match="entry" mode="markup">
+   <xsl:text>[</xsl:text>
+   <xsl:apply-templates select="para/node()" mode="markup"/>
+   <xsl:text>]</xsl:text>
 </xsl:template>
 
 
@@ -1553,7 +1609,7 @@
   <xsl:text>    </xsl:text>
   <xsl:choose>
     <xsl:when test="type = 'class AsyncStream'">
-      <xsl:text>class ``[link beast.ref.streams.AsyncStream [*AsyncStream]]``</xsl:text>
+      <xsl:text>class ``[link beast.concept.streams.AsyncStream [*AsyncStream]]``</xsl:text>
     </xsl:when>
     <xsl:when test="type = 'class AsyncReadStream'">
       <xsl:text>class __AsyncReadStream__</xsl:text>
@@ -1562,14 +1618,14 @@
       <xsl:text>class __AsyncWriteStream__</xsl:text>
     </xsl:when>
     <xsl:when test="type = 'class Body'">
-      <xsl:text>class ``[link beast.ref.Body [*Body]]``</xsl:text>
+      <xsl:text>class ``[link beast.concept.Body [*Body]]``</xsl:text>
     </xsl:when>
     <xsl:when test="type = 'class BufferSequence'">
-      <xsl:text>class ``[link beast.ref.BufferSequence [*BufferSequence]]``</xsl:text>
+      <xsl:text>class ``[link beast.concept.BufferSequence [*BufferSequence]]``</xsl:text>
     </xsl:when>
     <xsl:when test="(type = 'class' or type = 'class...') and declname = 'BufferSequence'">
       <xsl:value-of select="type"/>
-      <xsl:text> ``[link beast.ref.BufferSequence [*BufferSequence]]``</xsl:text>
+      <xsl:text> ``[link beast.concept.BufferSequence [*BufferSequence]]``</xsl:text>
     </xsl:when>
     <xsl:when test="declname = 'CompletionHandler' or type = 'class CompletionHandler'">
       <xsl:text>class __CompletionHandler__</xsl:text>
@@ -1578,7 +1634,7 @@
       <xsl:text>class __ConstBufferSequence__</xsl:text>
     </xsl:when>
     <xsl:when test="declname = 'DynamicBuffer' or type = 'class DynamicBuffer'">
-      <xsl:text>class ``[link beast.ref.DynamicBuffer [*DynamicBuffer]]``</xsl:text>
+      <xsl:text>class ``[link beast.concept.DynamicBuffer [*DynamicBuffer]]``</xsl:text>
     </xsl:when>
     <xsl:when test="declname = 'Handler' or type = 'class Handler'">
       <xsl:text>class __Handler__</xsl:text>
@@ -1586,14 +1642,11 @@
     <xsl:when test="declname = 'MutableBufferSequence' or type = 'class MutableBufferSequence'">
       <xsl:text>class __MutableBufferSequence__</xsl:text>
     </xsl:when>
-    <xsl:when test="declname = 'Parser' or type = 'class Parser'">
-      <xsl:text>class ``[link beast.ref.Parser [*Parser]]``</xsl:text>
-    </xsl:when>
     <xsl:when test="declname = 'Stream' or type = 'class Stream'">
-      <xsl:text>class ``[link beast.ref.streams.Stream [*Stream]]``</xsl:text>
+      <xsl:text>class ``[link beast.concept.streams.Stream [*Stream]]``</xsl:text>
     </xsl:when>
     <xsl:when test="type = 'class SyncStream'">
-      <xsl:text>class ``[link beast.ref.streams.SyncStream [*SyncStream]]``</xsl:text>
+      <xsl:text>class ``[link beast.concept.streams.SyncStream [*SyncStream]]``</xsl:text>
     </xsl:when>
     <xsl:when test="declname = 'SyncReadStream' or type = 'class SyncReadStream'">
       <xsl:text>class __SyncReadStream__</xsl:text>

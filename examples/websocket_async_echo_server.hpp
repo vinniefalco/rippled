@@ -8,8 +8,7 @@
 #ifndef WEBSOCKET_ASYNC_ECHO_SERVER_HPP
 #define WEBSOCKET_ASYNC_ECHO_SERVER_HPP
 
-#include <beast/core/placeholders.hpp>
-#include <beast/core/streambuf.hpp>
+#include <beast/core/multi_buffer.hpp>
 #include <beast/websocket/stream.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/optional.hpp>
@@ -21,8 +20,6 @@
 #include <string>
 #include <thread>
 #include <type_traits>
-#include <typeindex>
-#include <unordered_map>
 #include <utility>
 
 namespace websocket {
@@ -38,100 +35,6 @@ public:
     using endpoint_type = boost::asio::ip::tcp::endpoint;
 
 private:
-    struct identity
-    {
-        template<class Body, class Fields>
-        void
-        operator()(beast::http::message<
-            true, Body, Fields>& req) const
-        {
-            req.fields.replace("User-Agent", "async_echo_client");
-        }
-
-        template<class Body, class Fields>
-        void
-        operator()(beast::http::message<
-            false, Body, Fields>& resp) const
-        {
-            resp.fields.replace("Server", "async_echo_server");
-        }
-    };
-
-    /** A container of type-erased option setters.
-    */
-    template<class NextLayer>
-    class options_set
-    {
-        // workaround for std::function bug in msvc
-        struct callable
-        {
-            virtual ~callable() = default;
-            virtual void operator()(
-                beast::websocket::stream<NextLayer>&) = 0;
-        };
-
-        template<class T>
-        class callable_impl : public callable
-        {
-            T t_;
-
-        public:
-            template<class U>
-            callable_impl(U&& u)
-                : t_(std::forward<U>(u))
-            {
-            }
-
-            void
-            operator()(beast::websocket::stream<NextLayer>& ws)
-            {
-                t_(ws);
-            }
-        };
-
-        template<class Opt>
-        class lambda
-        {
-            Opt opt_;
-
-        public:
-            lambda(lambda&&) = default;
-            lambda(lambda const&) = default;
-
-            lambda(Opt const& opt)
-                : opt_(opt)
-            {
-            }
-
-            void
-            operator()(beast::websocket::stream<NextLayer>& ws) const
-            {
-                ws.set_option(opt_);
-            }
-        };
-
-        std::unordered_map<std::type_index,
-            std::unique_ptr<callable>> list_;
-
-    public:
-        template<class Opt>
-        void
-        set_option(Opt const& opt)
-        {
-            std::unique_ptr<callable> p;
-            p.reset(new callable_impl<lambda<Opt>>{opt});
-            list_[std::type_index{
-                typeid(Opt)}] = std::move(p);
-        }
-
-        void
-        set_options(beast::websocket::stream<NextLayer>& ws)
-        {
-            for(auto const& op : list_)
-                (*op.second)(ws);
-        }
-    };
-
     std::ostream* log_;
     boost::asio::io_service ios_;
     socket_type sock_;
@@ -139,7 +42,7 @@ private:
     boost::asio::ip::tcp::acceptor acceptor_;
     std::vector<std::thread> thread_;
     boost::optional<boost::asio::io_service::work> work_;
-    options_set<socket_type> opts_;
+    std::function<void(beast::websocket::stream<socket_type>&)> mod_;
 
 public:
     async_echo_server(async_echo_server const&) = delete;
@@ -159,8 +62,6 @@ public:
         , acceptor_(ios_)
         , work_(ios_)
     {
-        opts_.set_option(
-            beast::websocket::decorate(identity{}));
         thread_.reserve(threads);
         for(std::size_t i = 0; i < threads; ++i)
             thread_.emplace_back(
@@ -172,9 +73,12 @@ public:
     ~async_echo_server()
     {
         work_ = boost::none;
-        error_code ec;
         ios_.dispatch(
-            [&]{ acceptor_.close(ec); });
+            [&]
+            {
+                error_code ec;
+                acceptor_.close(ec);
+            });
         for(auto& t : thread_)
             t.join();
     }
@@ -187,17 +91,16 @@ public:
         return acceptor_.local_endpoint();
     }
 
-    /** Set a websocket option.
+    /** Set a handler called for new streams.
 
-        The option will be applied to all new connections.
-
-        @param opt The option to apply.
+        This function is called for each new stream.
+        It is used to set options for every connection.
     */
-    template<class Opt>
+    template<class F>
     void
-    set_option(Opt const& opt)
+    on_new_stream(F const& f)
     {
-        opts_.set_option(opt);
+        mod_ = f;
     }
 
     /** Open a listening port.
@@ -223,7 +126,7 @@ public:
             return fail("listen", ec);
         acceptor_.async_accept(sock_, ep_,
             std::bind(&async_echo_server::on_accept, this,
-                beast::asio::placeholders::error));
+                std::placeholders::_1));
     }
 
 private:
@@ -236,8 +139,7 @@ private:
             int state = 0;
             beast::websocket::stream<socket_type> ws;
             boost::asio::io_service::strand strand;
-            beast::websocket::opcode op;
-            beast::streambuf db;
+            beast::multi_buffer db;
             std::size_t id;
 
             data(async_echo_server& server_,
@@ -275,14 +177,20 @@ private:
                     std::forward<Args>(args)...))
         {
             auto& d = *d_;
-            d.server.opts_.set_options(d.ws);
+            d.server.mod_(d.ws);
             run();
         }
 
         void run()
         {
             auto& d = *d_;
-            d.ws.async_accept(std::move(*this));
+            d.ws.async_accept_ex(
+                [](beast::websocket::response_type& res)
+                {
+                    res.insert(
+                        "Server", "async_echo_server");
+                },
+                std::move(*this));
         }
 
         void operator()(error_code ec, std::size_t)
@@ -309,7 +217,7 @@ private:
                 d.db.consume(d.db.size());
                 // read message
                 d.state = 2;
-                d.ws.async_read(d.op, d.db,
+                d.ws.async_read(d.db,
                     d.strand.wrap(std::move(*this)));
                 return;
 
@@ -321,8 +229,7 @@ private:
                     return fail("async_read", ec);
                 // write message
                 d.state = 1;
-                d.ws.set_option(
-                    beast::websocket::message_type(d.op));
+                d.ws.binary(d.ws.got_binary());
                 d.ws.async_write(d.db.data(),
                     d.strand.wrap(std::move(*this)));
                 return;
@@ -366,7 +273,7 @@ private:
         peer{*this, ep_, std::move(sock_)};
         acceptor_.async_accept(sock_, ep_,
             std::bind(&async_echo_server::on_accept, this,
-                beast::asio::placeholders::error));
+                std::placeholders::_1));
     }
 };
 

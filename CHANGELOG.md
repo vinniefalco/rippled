@@ -1,3 +1,376 @@
+Version 55:
+
+* Don't allocate memory to handle obs-fold
+* Add Beast CMake interface target
+* Avoid a parser allocation using non-flat buffer
+* read_size replaces read_size_helper
+
+--------------------------------------------------------------------------------
+
+Version 54:
+
+* static_buffer coverage
+* flat_buffer coverage
+* multi_buffer coverage
+* consuming_buffers members and coverage
+* basic_fields members and coverage
+* Add string_param
+* Retain ownership when reading using a message
+* Fix incorrect use of [[fallthrough]]
+
+API Changes:
+
+* basic_fields refactor 
+
+--------------------------------------------------------------------------------
+
+Version 53:
+
+* Fix basic_parser::maybe_flatten
+* Fix read_size_helper usage
+
+--------------------------------------------------------------------------------
+
+Version 52:
+
+* flat_buffer is an AllocatorAwareContainer
+* Add drain_buffer class
+
+API Changes:
+
+* `auto_fragment` is a member of `stream`
+* `binary`, `text` are members of `stream`
+* read_buffer_size is a member of `stream`
+* read_message_max is a member of `stream`
+* `write_buffer_size` is a member of `stream`
+* `ping_callback` is a member of stream
+* Remove `opcode` from `read`, `async_read`
+* `read_frame` returns `bool` fin
+* `opcode` is private
+* finish(error_code&) is a BodyReader requirement
+
+Actions Required:
+
+* Change call sites which use `auto_fragment` with `set_option`
+  to call `stream::auto_fragment` instead.
+
+* Change call sites which use message_type with `set_option`
+  to call `stream::binary` or `stream::text` instead.
+
+* Change call sites which use `read_buffer_size` with `set_option` to
+  call `stream::read_buffer_size` instead.
+
+* Change call sites which use `read_message_max` with `set_option` to
+  call `stream::read_message_max` instead.
+
+* Change call sites which use `write_buffer_size` with `set_option` to
+  call `stream::write_buffer_size` instead.
+
+* Change call sites which use `ping_callback1 with `set_option` to
+  call `stream::ping_callback` instead.
+
+* Remove the `opcode` reference parameter from calls to synchronous
+  and asynchronous read functions, replace the logic with calls to
+  `stream::got_binary` and `stream::got_text` instead.
+
+* Remove the `frame_info` parameter from all read frame call sites
+
+* Check the return value 'fin' for calls to `read_frame`
+
+* Change ReadHandlers passed to `async_read_frame` to have
+  the signature `void(error_code, bool fin)`, use the `bool`
+  to indicate if the frame is the last frame.
+
+* Remove all occurrences of the `opcode` enum at call sites
+
+--------------------------------------------------------------------------------
+
+Version 51
+
+* Fix operator<< for header
+* Tidy up file_body
+* Fix file_body::get() not setting the more flag correctly
+* Use BOOST_FALLTHROUGH
+* Use BOOST_STRINGIZE
+* DynamicBuffer benchmarks
+* Add construct, destroy to handler_alloc
+* Fix infinite loop in basic_parser
+
+API Changes:
+
+* Tune up static_buffer
+* multi_buffer implementation change 
+
+Actions Required:
+
+* Call sites passing a number to multi_buffer's constructor
+  will need to be adjusted, see the corresponding commit message.
+
+--------------------------------------------------------------------------------
+
+Version 50
+
+* parser is constructible from other body types
+* Add field enumeration
+* Use allocator more in basic_fields
+* Fix basic_fields allocator awareness
+* Use field in basic_fields and call sites
+* Use field in basic_parser
+* Tidy up basic_fields, header, and field concepts
+* Fields concept work
+* Body documentation work
+* Add missing handler_alloc nested types
+* Fix chunk delimiter parsing
+* Fix test::pipe read_size
+* Fix chunk header parsing
+
+API Changes:
+
+* Remove header_parser
+* Add verb to on_request for parsers
+* Refactor prepare
+* Protect basic_fields special members
+* Remove message connection settings
+* Remove message free functions
+* Remove obsolete serializer allocator
+* http read_some, async_read_some don't return bytes
+
+--------------------------------------------------------------------------------
+
+Version 49
+
+* Use <iosfwd> instead of <ostream>
+
+HTTP:
+
+* Add HEAD request example
+
+API Changes:
+
+* Refactor method and verb
+* Canonicalize string_view parameter types
+* Tidy up empty_body writer error
+* Refactor header status, reason, and target
+
+--------------------------------------------------------------------------------
+
+Version 48
+
+* Make buffer_prefix_view public
+* Remove detail::sync_ostream
+* Tidy up core type traits
+
+API Changes:
+
+* Tidy up chunk decorator
+* Rename to buffer_cat_view
+* Consolidate parsers to parser.hpp
+* Rename to parser
+
+--------------------------------------------------------------------------------
+
+Version 47
+
+* Disable operator<< for buffer_body
+* buffer_size overload for basic_multi_buffer::const_buffers_type
+* Fix undefined behavior in pausation
+* Fix leak in basic_flat_buffer
+
+API Changes:
+
+* Refactor treatment of request-method
+* Refactor treatment of status code and obsolete reason
+* Refactor HTTP serialization and parsing
+
+--------------------------------------------------------------------------------
+
+Version 46
+
+* Add test::pipe
+* Documentation work
+
+API Changes:
+
+* Remove HTTP header aliases
+* Refactor HTTP serialization
+* Refactor type traits
+
+--------------------------------------------------------------------------------
+
+Version 45
+
+* Workaround for boost::asio::basic_streambuf type check
+* Fix message doc image
+* Better test::enable_yield_to
+* Fix header::reason
+* Documentation work
+* buffer_view skips empty buffer sequences
+* Disable reverse_iterator buffer_view test
+
+--------------------------------------------------------------------------------
+
+Version 44
+
+* Use BOOST_THROW_EXCEPTION
+* Tidy up read_size_helper and dynamic buffers
+* Require Boost 1.58.0 or later
+* Tidy up and make get_lowest_layer public
+* Use BOOST_STATIC_ASSERT
+* Fix async return values in docs
+* Fix README websocket example
+* Add buffers_adapter regression test
+* Tidy up is_dynamic_buffer traits test
+* Make buffers_adapter meet requirements
+
+--------------------------------------------------------------------------------
+
+Version 43
+
+* Require Boost 1.64.0
+* Fix strict aliasing warnings in buffers_view
+* Tidy up buffer_prefix overloads and test
+* Add write limit to test::string_ostream
+* Additional constructors for consuming_buffers
+
+--------------------------------------------------------------------------------
+
+Version 42
+
+* Fix javadoc typo
+* Add formal review notes
+* Make buffers_view a public interface
+
+--------------------------------------------------------------------------------
+
+Version 41
+
+* Trim Appveyor matrix rows
+* Concept revision and documentation
+* Remove coveralls integration
+* Tidy up formal parameter names
+
+WebSocket
+
+* Tidy up websocket::close_code enum and constructors
+
+API Changes
+
+* Return http::error::end_of_stream on HTTP read eof
+* Remove placeholders
+* Rename prepare_buffer(s) to buffer_prefix
+* Remove handler helpers, tidy up hook invocations
+
+--------------------------------------------------------------------------------
+
+Version 40
+
+* Add to_static_string
+* Consolidate get_lowest_layer in type_traits.hpp
+* Fix basic_streambuf movable trait
+* Tidy up .travis.yml
+
+--------------------------------------------------------------------------------
+
+Version 39
+
+Beast versions are now identified by a single integer which
+is incremented on each merge. The macro BEAST_VERSION
+identifies the version number, currently at 39. A version
+setting commit will always be at the tip of the master
+and develop branches.
+
+* Use beast::string_view alias
+* Fixed braced-init error with older gcc
+
+HTTP
+
+* Tidy up basic_parser javadocs
+
+WebSocket:
+
+* Add websocket async echo ssl server test:
+* Fix eof error on ssl::stream shutdown
+
+API Changes:
+
+* Refactor http::header contents
+* New ostream() returns dynamic buffer output stream
+* New buffers() replaces to_string()
+* Rename to multi_buffer, basic_multi_buffer
+* Rename to flat_buffer, basic_flat_buffer
+* Rename to static_buffer, static_buffer_n
+* Rename to buffered_read_stream
+* Harmonize concepts and identifiers with net-ts
+* Tidy up HTTP reason_string
+
+--------------------------------------------------------------------------------
+
+1.0.0-b38
+
+* Refactor static_string
+* Refactor base64
+* Use static_string for WebSocket handshakes
+* Simplify get_lowest_layer test
+* Add test_allocator to extras/test
+* More flat_streambuf tests
+* WebSocket doc work
+* Prevent basic_fields operator[] assignment
+
+API Changes:
+
+* Refactor WebSocket error codes
+* Remove websocket::keep_alive option
+
+--------------------------------------------------------------------------------
+
+1.0.0-b37
+
+* CMake hide command lines in .vcxproj Output windows"
+* Rename to detail::is_invocable
+* Rename project to http-bench
+* Fix flat_streambuf
+* Add ub sanitizer blacklist
+* Add -funsigned-char to asan build target
+* Fix narrowing warning in table constants
+
+WebSocket:
+
+* Add is_upgrade() free function
+* Document websocket::stream thread safety
+* Rename to websocket::detail::pausation
+
+API Changes:
+
+* Provide websocket::stream accept() overloads
+* Refactor websocket decorators
+* Move everything in basic_fields.hpp to fields.hpp
+* Rename to http::dynamic_body, consolidate header
+
+--------------------------------------------------------------------------------
+
+1.0.0-b36
+
+* Update README.md
+
+--------------------------------------------------------------------------------
+
+1.0.0-b35
+
+* Add Appveyor build scripts and badge
+* Tidy up MSVC CMake configuration
+* Make close_code a proper enum
+* Add flat_streambuf
+* Rename to BEAST_DOXYGEN
+* Update .gitignore for VS2017
+* Fix README.md CMake instructions
+
+API Changes:
+
+* New HTTP interfaces
+* Remove http::empty_body
+
+--------------------------------------------------------------------------------
+
 1.0.0-b34
 
 * Fix and tidy up CMake build scripts

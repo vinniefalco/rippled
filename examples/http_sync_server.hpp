@@ -12,8 +12,7 @@
 #include "mime_type.hpp"
 
 #include <beast/http.hpp>
-#include <beast/core/placeholders.hpp>
-#include <beast/core/streambuf.hpp>
+#include <beast/core/multi_buffer.hpp>
 #include <boost/asio.hpp>
 #include <cstdint>
 #include <cstdio>
@@ -59,7 +58,7 @@ public:
             boost::asio::socket_base::max_connections);
         acceptor_.async_accept(sock_,
             std::bind(&http_sync_server::on_accept, this,
-                beast::asio::placeholders::error));
+                std::placeholders::_1));
         thread_ = std::thread{[&]{ ios_.run(); }};
     }
 
@@ -106,7 +105,7 @@ private:
     fail(int id, error_code const& ec)
     {
         if(ec != boost::asio::error::operation_aborted &&
-                ec != boost::asio::error::eof)
+                ec != error::end_of_stream)
             log("#", id, " ", ec.message(), "\n");
     }
 
@@ -143,35 +142,34 @@ private:
         std::thread{lambda{++id_, *this, std::move(sock_)}}.detach();
         acceptor_.async_accept(sock_,
             std::bind(&http_sync_server::on_accept, this,
-                asio::placeholders::error));
+                std::placeholders::_1));
     }
 
     void
     do_peer(int id, socket_type&& sock0)
     {
         socket_type sock(std::move(sock0));
-        streambuf sb;
+        multi_buffer b;
         error_code ec;
         for(;;)
         {
             req_type req;
-            http::read(sock, sb, req, ec);
+            http::read(sock, b, req, ec);
             if(ec)
                 break;
-            auto path = req.url;
+            auto path = req.target().to_string();
             if(path == "/")
                 path = "/index.html";
             path = root_ + path;
             if(! boost::filesystem::exists(path))
             {
                 response<string_body> res;
-                res.status = 404;
-                res.reason = "Not Found";
+                res.result(status::not_found);
                 res.version = req.version;
-                res.fields.insert("Server", "http_sync_server");
-                res.fields.insert("Content-Type", "text/html");
+                res.insert(field::server, "http_sync_server");
+                res.insert(field::content_type, "text/html");
                 res.body = "The file '" + path + "' was not found";
-                prepare(res);
+                res.prepare();
                 write(sock, res, ec);
                 if(ec)
                     break;
@@ -180,13 +178,13 @@ private:
             try
             {
                 resp_type res;
-                res.status = 200;
-                res.reason = "OK";
+                res.result(status::ok);
+                res.reason("OK");
                 res.version = req.version;
-                res.fields.insert("Server", "http_sync_server");
-                res.fields.insert("Content-Type", mime_type(path));
+                res.insert(field::server, "http_sync_server");
+                res.insert(field::content_type, mime_type(path));
                 res.body = path;
-                prepare(res);
+                res.prepare();
                 write(sock, res, ec);
                 if(ec)
                     break;
@@ -194,14 +192,14 @@ private:
             catch(std::exception const& e)
             {
                 response<string_body> res;
-                res.status = 500;
-                res.reason = "Internal Error";
+                res.result(status::internal_server_error);
+                res.reason("Internal Error");
                 res.version = req.version;
-                res.fields.insert("Server", "http_sync_server");
-                res.fields.insert("Content-Type", "text/html");
+                res.insert(field::server, "http_sync_server");
+                res.insert(field::content_type, "text/html");
                 res.body =
                     std::string{"An internal error occurred: "} + e.what();
-                prepare(res);
+                res.prepare();
                 write(sock, res, ec);
                 if(ec)
                     break;

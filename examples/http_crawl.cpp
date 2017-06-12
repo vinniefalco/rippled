@@ -7,7 +7,7 @@
 
 #include "urls_large_data.hpp"
 
-#include <beast/core/streambuf.hpp>
+#include <beast/core/multi_buffer.hpp>
 #include <beast/http.hpp>
 #include <boost/asio.hpp>
 #include <boost/lexical_cast.hpp>
@@ -36,18 +36,18 @@ int main(int, char const*[])
             ip::tcp::socket sock(ios);
             connect(sock, it);
             auto ep = sock.remote_endpoint();
-            request<empty_body> req;
-            req.method = "GET";
-            req.url = "/";
+            request<string_body> req;
+            req.method(verb::get);
             req.version = 11;
-            req.fields.insert("Host", host + std::string(":") +
+            req.target("/");
+            req.insert(field::host, host + std::string(":") +
                 boost::lexical_cast<std::string>(ep.port()));
-            req.fields.insert("User-Agent", "beast/http");
-            prepare(req);
+            req.insert(field::user_agent, "beast/http");
+            req.prepare();
             write(sock, req);
             response<string_body> res;
-            streambuf sb;
-            beast::http::read(sock, sb, res);
+            beast::multi_buffer b;
+            beast::http::read(sock, b, res);
             std::cout << res;
         }
         catch(beast::system_error const& ec)

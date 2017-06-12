@@ -8,26 +8,29 @@
 #ifndef BEAST_WEBSOCKET_IMPL_STREAM_IPP
 #define BEAST_WEBSOCKET_IMPL_STREAM_IPP
 
+#include <beast/websocket/rfc6455.hpp>
 #include <beast/websocket/teardown.hpp>
 #include <beast/websocket/detail/hybi13.hpp>
 #include <beast/websocket/detail/pmd_extension.hpp>
+#include <beast/version.hpp>
 #include <beast/http/read.hpp>
 #include <beast/http/write.hpp>
-#include <beast/http/reason.hpp>
 #include <beast/http/rfc7230.hpp>
 #include <beast/core/buffer_cat.hpp>
-#include <beast/core/buffer_concepts.hpp>
+#include <beast/core/buffer_prefix.hpp>
 #include <beast/core/consuming_buffers.hpp>
-#include <beast/core/prepare_buffers.hpp>
-#include <beast/core/static_streambuf.hpp>
-#include <beast/core/stream_concepts.hpp>
+#include <beast/core/static_buffer.hpp>
+#include <beast/core/type_traits.hpp>
 #include <beast/core/detail/type_traits.hpp>
 #include <boost/assert.hpp>
 #include <boost/endian/buffers.hpp>
+#include <boost/throw_exception.hpp>
 #include <algorithm>
 #include <memory>
 #include <stdexcept>
 #include <utility>
+
+#include <iostream>
 
 namespace beast {
 namespace websocket {
@@ -47,20 +50,20 @@ set_option(permessage_deflate const& o)
 {
     if( o.server_max_window_bits > 15 ||
         o.server_max_window_bits < 9)
-        throw std::invalid_argument{
-            "invalid server_max_window_bits"};
+        BOOST_THROW_EXCEPTION(std::invalid_argument{
+            "invalid server_max_window_bits"});
     if( o.client_max_window_bits > 15 ||
         o.client_max_window_bits < 9)
-        throw std::invalid_argument{
-            "invalid client_max_window_bits"};
+        BOOST_THROW_EXCEPTION(std::invalid_argument{
+            "invalid client_max_window_bits"});
     if( o.compLevel < 0 ||
         o.compLevel > 9)
-        throw std::invalid_argument{
-            "invalid compLevel"};
+        BOOST_THROW_EXCEPTION(std::invalid_argument{
+            "invalid compLevel"});
     if( o.memLevel < 1 ||
         o.memLevel > 9)
-        throw std::invalid_argument{
-            "invalid memLevel"};
+        BOOST_THROW_EXCEPTION(std::invalid_argument{
+            "invalid memLevel"});
     pmd_opts_ = o;
 }
 
@@ -83,20 +86,90 @@ reset()
 }
 
 template<class NextLayer>
-http::request<http::empty_body>
+template<class Decorator>
+void
 stream<NextLayer>::
-build_request(boost::string_ref const& host,
-    boost::string_ref const& resource, std::string& key)
+do_accept(
+    Decorator const& decorator, error_code& ec)
 {
-    http::request<http::empty_body> req;
-    req.url = { resource.data(), resource.size() };
+    http::request_parser<http::empty_body> p;
+    http::read_header(next_layer(),
+        stream_.buffer(), p, ec);
+    if(ec)
+        return;
+    do_accept(p.get(), decorator, ec);
+}
+
+template<class NextLayer>
+template<class Fields, class Decorator>
+void
+stream<NextLayer>::
+do_accept(http::header<true, Fields> const& req,
+    Decorator const& decorator, error_code& ec)
+{
+    auto const res = build_response(req, decorator);
+    http::write(stream_, res, ec);
+    if(ec)
+        return;
+    if(res.result() != http::status::switching_protocols)
+    {
+        ec = error::handshake_failed;
+        // VFALCO TODO Respect keep alive setting, perform
+        //             teardown if Connection: close.
+        return;
+    }
+    pmd_read(pmd_config_, req);
+    open(detail::role_type::server);
+}
+
+template<class NextLayer>
+template<class RequestDecorator>
+void
+stream<NextLayer>::
+do_handshake(response_type* res_p,
+    string_view host,
+        string_view target,
+            RequestDecorator const& decorator,
+                error_code& ec)
+{
+    response_type res;
+    reset();
+    detail::sec_ws_key_type key;
+    {
+        auto const req = build_request(
+            key, host, target, decorator);
+        pmd_read(pmd_config_, req);
+        http::write(stream_, req, ec);
+    }
+    if(ec)
+        return;
+    http::read(next_layer(), stream_.buffer(), res, ec);
+    if(ec)
+        return;
+    do_response(res, key, ec);
+    if(res_p)
+        swap(res, *res_p);
+}
+
+template<class NextLayer>
+template<class Decorator>
+request_type
+stream<NextLayer>::
+build_request(detail::sec_ws_key_type& key,
+    string_view host,
+        string_view target,
+            Decorator const& decorator)
+{
+    request_type req;
+    req.target(target);
     req.version = 11;
-    req.method = "GET";
-    req.fields.insert("Host", host);
-    req.fields.insert("Upgrade", "websocket");
-    key = detail::make_sec_ws_key(maskgen_);
-    req.fields.insert("Sec-WebSocket-Key", key);
-    req.fields.insert("Sec-WebSocket-Version", "13");
+    req.method(http::verb::get);
+    req.insert(http::field::host, host);
+    req.insert(http::field::upgrade, "websocket");
+    req.insert(http::field::connection, "upgrade");
+    detail::make_sec_ws_key(key, maskgen_);
+    req.insert(http::field::sec_websocket_key, key);
+    req.insert(http::field::sec_websocket_version, "13");
     if(pmd_opts_.client_enable)
     {
         detail::pmd_offer config;
@@ -109,115 +182,128 @@ build_request(boost::string_ref const& host,
             pmd_opts_.server_no_context_takeover;
         config.client_no_context_takeover =
             pmd_opts_.client_no_context_takeover;
-        detail::pmd_write(
-            req.fields, config);
+        detail::pmd_write(req, config);
     }
-    d_(req);
-    http::prepare(req, http::connection::upgrade);
+    decorator(req);
+    if(! req.count(http::field::user_agent))
+        req.insert(http::field::user_agent,
+            BEAST_VERSION_STRING);
     return req;
 }
 
 template<class NextLayer>
-template<class Body, class Fields>
-http::response<http::string_body>
+template<class Fields, class Decorator>
+response_type
 stream<NextLayer>::
-build_response(http::request<Body, Fields> const& req)
+build_response(http::header<true, Fields> const& req,
+    Decorator const& decorator)
 {
+    auto const decorate =
+        [&decorator](response_type& res)
+        {
+            decorator(res);
+            if(! res.count(http::field::server))
+            {
+                BOOST_STATIC_ASSERT(sizeof(BEAST_VERSION_STRING) < 20);
+                static_string<20> s(BEAST_VERSION_STRING);
+                res.insert(http::field::server, s);
+            }
+        };
     auto err =
         [&](std::string const& text)
         {
-            http::response<http::string_body> res;
-            res.status = 400;
-            res.reason = http::reason_string(res.status);
+            response_type res;
             res.version = req.version;
+            res.result(http::status::bad_request);
             res.body = text;
-            d_(res);
-            prepare(res,
-                (is_keep_alive(req) && keep_alive_) ?
-                    http::connection::keep_alive :
-                    http::connection::close);
+            res.prepare();
+            decorate(res);
             return res;
         };
     if(req.version < 11)
         return err("HTTP version 1.1 required");
-    if(req.method != "GET")
+    if(req.method() != http::verb::get)
         return err("Wrong method");
     if(! is_upgrade(req))
         return err("Expected Upgrade request");
-    if(! req.fields.exists("Host"))
+    if(! req.count(http::field::host))
         return err("Missing Host");
-    if(! req.fields.exists("Sec-WebSocket-Key"))
+    if(! req.count(http::field::sec_websocket_key))
         return err("Missing Sec-WebSocket-Key");
-    if(! http::token_list{req.fields["Upgrade"]}.exists("websocket"))
+    if(! http::token_list{req[http::field::upgrade]}.exists("websocket"))
         return err("Missing websocket Upgrade token");
+    auto const key = req[http::field::sec_websocket_key];
+    if(key.size() > detail::sec_ws_key_type::max_size_n)
+        return err("Invalid Sec-WebSocket-Key");
     {
         auto const version =
-            req.fields["Sec-WebSocket-Version"];
+            req[http::field::sec_websocket_version];
         if(version.empty())
             return err("Missing Sec-WebSocket-Version");
         if(version != "13")
         {
-            http::response<http::string_body> res;
-            res.status = 426;
-            res.reason = http::reason_string(res.status);
+            response_type res;
+            res.result(http::status::upgrade_required);
             res.version = req.version;
-            res.fields.insert("Sec-WebSocket-Version", "13");
-            d_(res);
-            prepare(res,
-                (is_keep_alive(req) && keep_alive_) ?
-                    http::connection::keep_alive :
-                    http::connection::close);
+            res.insert(http::field::sec_websocket_version, "13");
+            res.prepare();
+            decorate(res);
             return res;
         }
     }
-    http::response<http::string_body> res;
+
+    response_type res;
     {
         detail::pmd_offer offer;
         detail::pmd_offer unused;
-        pmd_read(offer, req.fields);
-        pmd_negotiate(
-            res.fields, unused, offer, pmd_opts_);
+        pmd_read(offer, req);
+        pmd_negotiate(res, unused, offer, pmd_opts_);
     }
-    res.status = 101;
-    res.reason = http::reason_string(res.status);
+    res.result(http::status::switching_protocols);
     res.version = req.version;
-    res.fields.insert("Upgrade", "websocket");
+    res.insert(http::field::upgrade, "websocket");
+    res.insert(http::field::connection, "upgrade");
     {
-        auto const key =
-            req.fields["Sec-WebSocket-Key"];
-        res.fields.insert("Sec-WebSocket-Accept",
-            detail::make_sec_ws_accept(key));
+        detail::sec_ws_accept_type accept;
+        detail::make_sec_ws_accept(accept, key);
+        res.insert(http::field::sec_websocket_accept, accept);
     }
-    res.fields.replace("Server", "Beast.WSProto");
-    d_(res);
-    http::prepare(res, http::connection::upgrade);
+    decorate(res);
     return res;
 }
 
 template<class NextLayer>
-template<class Body, class Fields>
 void
 stream<NextLayer>::
-do_response(http::response<Body, Fields> const& res,
-    boost::string_ref const& key, error_code& ec)
+do_response(http::header<false> const& res,
+    detail::sec_ws_key_type const& key, error_code& ec)
 {
-    // VFALCO Review these error codes
-    auto fail = [&]{ ec = error::response_failed; };
-    if(res.version < 11)
-        return fail();
-    if(res.status != 101)
-        return fail();
-    if(! is_upgrade(res))
-        return fail();
-    if(! http::token_list{res.fields["Upgrade"]}.exists("websocket"))
-        return fail();
-    if(! res.fields.exists("Sec-WebSocket-Accept"))
-        return fail();
-    if(res.fields["Sec-WebSocket-Accept"] !=
-        detail::make_sec_ws_accept(key))
-        return fail();
+    bool const success = [&]()
+    {
+        if(res.version < 11)
+            return false;
+        if(res.result() != http::status::switching_protocols)
+            return false;
+        if(! http::token_list{res[http::field::connection]}.exists("upgrade"))
+            return false;
+        if(! http::token_list{res[http::field::upgrade]}.exists("websocket"))
+            return false;
+        if(res.count(http::field::sec_websocket_accept) != 1)
+            return false;
+        detail::sec_ws_accept_type accept;
+        detail::make_sec_ws_accept(accept, key);
+        if(accept.compare(
+                res[http::field::sec_websocket_accept]) != 0)
+            return false;
+        return true;
+    }();
+    if(! success)
+    {
+        ec = error::handshake_failed;
+        return;
+    }
     detail::pmd_offer offer;
-    pmd_read(offer, res.fields);
+    pmd_read(offer, res);
     // VFALCO see if offer satisfies pmd_config_,
     //        return an error if not.
     pmd_config_ = offer; // overwrite for now

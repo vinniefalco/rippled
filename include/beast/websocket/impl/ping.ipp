@@ -9,10 +9,14 @@
 #define BEAST_WEBSOCKET_IMPL_PING_IPP
 
 #include <beast/core/bind_handler.hpp>
-#include <beast/core/handler_helpers.hpp>
 #include <beast/core/handler_ptr.hpp>
-#include <beast/core/stream_concepts.hpp>
+#include <beast/core/type_traits.hpp>
 #include <beast/websocket/detail/frame.hpp>
+#include <boost/asio/handler_alloc_hook.hpp>
+#include <boost/asio/handler_continuation_hook.hpp>
+#include <boost/asio/handler_invoke_hook.hpp>
+#include <boost/config.hpp>
+#include <boost/throw_exception.hpp>
 #include <memory>
 
 namespace beast {
@@ -34,15 +38,15 @@ class stream<NextLayer>::ping_op
         int state = 0;
 
         data(Handler& handler, stream<NextLayer>& ws_,
-                opcode op_, ping_data const& payload)
-            : cont(beast_asio_helpers::
-                is_continuation(handler))
-            , ws(ws_)
+                detail::opcode op_, ping_data const& payload)
+            : ws(ws_)
         {
+            using boost::asio::asio_handler_is_continuation;
+            cont = asio_handler_is_continuation(std::addressof(handler));
             using boost::asio::buffer;
             using boost::asio::buffer_copy;
             ws.template write_ping<
-                static_streambuf>(fb, op_, payload);
+                static_buffer>(fb, op_, payload);
         }
     };
 
@@ -74,16 +78,18 @@ public:
     void* asio_handler_allocate(
         std::size_t size, ping_op* op)
     {
-        return beast_asio_helpers::
-            allocate(size, op->d_.handler());
+        using boost::asio::asio_handler_allocate;
+        return asio_handler_allocate(
+            size, std::addressof(op->d_.handler()));
     }
 
     friend
     void asio_handler_deallocate(
         void* p, std::size_t size, ping_op* op)
     {
-        return beast_asio_helpers::
-            deallocate(p, size, op->d_.handler());
+        using boost::asio::asio_handler_deallocate;
+        asio_handler_deallocate(
+            p, size, std::addressof(op->d_.handler()));
     }
 
     friend
@@ -96,8 +102,9 @@ public:
     friend
     void asio_handler_invoke(Function&& f, ping_op* op)
     {
-        return beast_asio_helpers::
-            invoke(f, op->d_.handler());
+        using boost::asio::asio_handler_invoke;
+        asio_handler_invoke(
+            f, std::addressof(op->d_.handler()));
     }
 };
 
@@ -133,8 +140,7 @@ operator()(error_code ec, bool again)
             {
                 // suspend
                 d.state = 2;
-                d.ws.ping_op_.template emplace<
-                    ping_op>(std::move(*this));
+                d.ws.ping_op_.emplace(std::move(*this));
                 return;
             }
             if(d.ws.failed_ || d.ws.wr_close_)
@@ -147,7 +153,7 @@ operator()(error_code ec, bool again)
                 return;
             }
             d.ws.wr_block_ = &d;
-            // [[fallthrough]]
+            BOOST_FALLTHROUGH;
 
         case 1:
             // send ping frame
@@ -195,38 +201,38 @@ upcall:
 
 template<class NextLayer>
 template<class WriteHandler>
-typename async_completion<
-    WriteHandler, void(error_code)>::result_type
+async_return_type<
+    WriteHandler, void(error_code)>
 stream<NextLayer>::
 async_ping(ping_data const& payload, WriteHandler&& handler)
 {
-    static_assert(is_AsyncStream<next_layer_type>::value,
+    static_assert(is_async_stream<next_layer_type>::value,
         "AsyncStream requirements requirements not met");
-    beast::async_completion<
-        WriteHandler, void(error_code)
-            > completion{handler};
-    ping_op<decltype(completion.handler)>{
-        completion.handler, *this,
-            opcode::ping, payload};
-    return completion.result.get();
+    async_completion<WriteHandler,
+        void(error_code)> init{handler};
+    ping_op<handler_type<
+        WriteHandler, void(error_code)>>{
+            init.completion_handler, *this,
+                detail::opcode::ping, payload};
+    return init.result.get();
 }
 
 template<class NextLayer>
 template<class WriteHandler>
-typename async_completion<
-    WriteHandler, void(error_code)>::result_type
+async_return_type<
+    WriteHandler, void(error_code)>
 stream<NextLayer>::
 async_pong(ping_data const& payload, WriteHandler&& handler)
 {
-    static_assert(is_AsyncStream<next_layer_type>::value,
+    static_assert(is_async_stream<next_layer_type>::value,
         "AsyncStream requirements requirements not met");
-    beast::async_completion<
-        WriteHandler, void(error_code)
-            > completion{handler};
-    ping_op<decltype(completion.handler)>{
-        completion.handler, *this,
-            opcode::pong, payload};
-    return completion.result.get();
+    async_completion<WriteHandler,
+        void(error_code)> init{handler};
+    ping_op<handler_type<
+        WriteHandler, void(error_code)>>{
+            init.completion_handler, *this,
+                detail::opcode::pong, payload};
+    return init.result.get();
 }
 
 template<class NextLayer>
@@ -237,7 +243,7 @@ ping(ping_data const& payload)
     error_code ec;
     ping(payload, ec);
     if(ec)
-        throw system_error{ec};
+        BOOST_THROW_EXCEPTION(system_error{ec});
 }
 
 template<class NextLayer>
@@ -246,8 +252,8 @@ stream<NextLayer>::
 ping(ping_data const& payload, error_code& ec)
 {
     detail::frame_streambuf db;
-    write_ping<static_streambuf>(
-        db, opcode::ping, payload);
+    write_ping<static_buffer>(
+        db, detail::opcode::ping, payload);
     boost::asio::write(stream_, db.data(), ec);
 }
 
@@ -259,7 +265,7 @@ pong(ping_data const& payload)
     error_code ec;
     pong(payload, ec);
     if(ec)
-        throw system_error{ec};
+        BOOST_THROW_EXCEPTION(system_error{ec});
 }
 
 template<class NextLayer>
@@ -268,8 +274,8 @@ stream<NextLayer>::
 pong(ping_data const& payload, error_code& ec)
 {
     detail::frame_streambuf db;
-    write_ping<static_streambuf>(
-        db, opcode::pong, payload);
+    write_ping<static_buffer>(
+        db, detail::opcode::pong, payload);
     boost::asio::write(stream_, db.data(), ec);
 }
 

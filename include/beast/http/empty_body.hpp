@@ -9,62 +9,109 @@
 #define BEAST_HTTP_EMPTY_BODY_HPP
 
 #include <beast/config.hpp>
-#include <beast/core/error.hpp>
+#include <beast/http/error.hpp>
 #include <beast/http/message.hpp>
-#include <beast/core/detail/type_traits.hpp>
-#include <boost/asio/buffer.hpp>
-#include <memory>
-#include <string>
+#include <boost/optional.hpp>
 
 namespace beast {
 namespace http {
 
-/** An empty content-body.
+/** An empty message body.
 
-    Meets the requirements of @b `Body`.
+    This body is used to represent messages which do not have a
+    message body. If this body is used with a parser, and the
+    parser encounters octets corresponding to a message body,
+    the parser will fail with the error @ref http::unexpected_body.
+
+    Meets the requirements of @b Body. The Content-Length of this
+    body is always 0.
 */
 struct empty_body
 {
-#if GENERATING_DOCS
-    /// The type of the `message::body` member
-    using value_type = void;
+    /// The type of the body member when used in a message.
+    struct value_type
+    {
+        // VFALCO We could stash boost::optional<std::uint64_t>
+        //        for the content length here, set on init()
+    };
+
+    /// Returns the content length of the body in a message.
+    template<bool isRequest, class Fields>
+    static
+    std::uint64_t
+    size(message<isRequest, empty_body, Fields> const& m)
+    {
+        return 0;
+    }
+
+#if BEAST_DOXYGEN
+    /// The algorithm to obtain buffers representing the body
+    using reader = implementation_defined;
 #else
-    struct value_type {};
+    struct reader
+    {
+        using is_deferred = std::false_type;
+
+        using const_buffers_type =
+            boost::asio::null_buffers;
+
+        template<bool isRequest, class Fields>
+        explicit
+        reader(message<
+            isRequest, empty_body, Fields> const&)
+        {
+        }
+
+        void
+        init(error_code&)
+        {
+        }
+
+        boost::optional<std::pair<const_buffers_type, bool>>
+        get(error_code& ec)
+        {
+            return boost::none;
+        }
+
+        void
+        finish(error_code&)
+        {
+        }
+    };
 #endif
 
-#if GENERATING_DOCS
-private:
-#endif
-
+#if BEAST_DOXYGEN
+    /// The algorithm used store buffers in this body
+    using writer = implementation_defined;
+#else
     struct writer
     {
         template<bool isRequest, class Fields>
         explicit
-        writer(message<isRequest, empty_body, Fields> const& m) noexcept
+        writer(message<isRequest, empty_body, Fields>& msg)
         {
-            beast::detail::ignore_unused(m);
         }
 
         void
-        init(error_code& ec) noexcept
+        init(boost::optional<std::uint64_t> const&,
+            error_code&)
         {
-            beast::detail::ignore_unused(ec);
         }
 
-        std::uint64_t
-        content_length() const noexcept
+        template<class ConstBufferSequence>
+        void
+        put(ConstBufferSequence const&,
+            error_code& ec)
         {
-            return 0;
+            ec = error::unexpected_body;
         }
 
-        template<class WriteFunction>
-        bool
-        write(error_code&, WriteFunction&& wf) noexcept
+        void
+        finish(error_code&)
         {
-            wf(boost::asio::null_buffers{});
-            return true;
         }
     };
+#endif
 };
 
 } // http

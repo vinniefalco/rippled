@@ -8,10 +8,14 @@
 #ifndef BEAST_WEBSOCKET_IMPL_CLOSE_IPP
 #define BEAST_WEBSOCKET_IMPL_CLOSE_IPP
 
-#include <beast/core/handler_helpers.hpp>
 #include <beast/core/handler_ptr.hpp>
-#include <beast/core/static_streambuf.hpp>
-#include <beast/core/stream_concepts.hpp>
+#include <beast/core/static_buffer.hpp>
+#include <beast/core/type_traits.hpp>
+#include <boost/asio/handler_alloc_hook.hpp>
+#include <boost/asio/handler_continuation_hook.hpp>
+#include <boost/asio/handler_invoke_hook.hpp>
+#include <boost/config.hpp>
+#include <boost/throw_exception.hpp>
 #include <memory>
 
 namespace beast {
@@ -37,13 +41,13 @@ class stream<NextLayer>::close_op
 
         data(Handler& handler, stream<NextLayer>& ws_,
                 close_reason const& cr_)
-            : cont(beast_asio_helpers::
-                is_continuation(handler))
-            , ws(ws_)
+            : ws(ws_)
             , cr(cr_)
         {
+            using boost::asio::asio_handler_is_continuation;
+            cont = asio_handler_is_continuation(std::addressof(handler));
             ws.template write_close<
-                static_streambuf>(fb, cr);
+                static_buffer>(fb, cr);
         }
     };
 
@@ -77,16 +81,18 @@ public:
     void* asio_handler_allocate(
         std::size_t size, close_op* op)
     {
-        return beast_asio_helpers::
-            allocate(size, op->d_.handler());
+        using boost::asio::asio_handler_allocate;
+        return asio_handler_allocate(
+            size, std::addressof(op->d_.handler()));
     }
 
     friend
     void asio_handler_deallocate(
         void* p, std::size_t size, close_op* op)
     {
-        return beast_asio_helpers::
-            deallocate(p, size, op->d_.handler());
+        using boost::asio::asio_handler_deallocate;
+        asio_handler_deallocate(
+            p, size, std::addressof(op->d_.handler()));
     }
 
     friend
@@ -99,8 +105,9 @@ public:
     friend
     void asio_handler_invoke(Function&& f, close_op* op)
     {
-        return beast_asio_helpers::
-            invoke(f, op->d_.handler());
+        using boost::asio::asio_handler_invoke;
+        asio_handler_invoke(
+            f, std::addressof(op->d_.handler()));
     }
 };
 
@@ -135,8 +142,7 @@ operator()(error_code ec, bool again)
             {
                 // suspend
                 d.state = 2;
-                d.ws.wr_op_.template emplace<
-                    close_op>(std::move(*this));
+                d.ws.wr_op_.emplace(std::move(*this));
                 return;
             }
             if(d.ws.failed_ || d.ws.wr_close_)
@@ -148,7 +154,7 @@ operator()(error_code ec, bool again)
                 return;
             }
             d.ws.wr_block_ = &d;
-            // [[fallthrough]]
+            BOOST_FALLTHROUGH;
 
         case 1:
             // send close frame
@@ -197,19 +203,19 @@ upcall:
 
 template<class NextLayer>
 template<class CloseHandler>
-typename async_completion<
-    CloseHandler, void(error_code)>::result_type
+async_return_type<
+    CloseHandler, void(error_code)>
 stream<NextLayer>::
 async_close(close_reason const& cr, CloseHandler&& handler)
 {
-    static_assert(is_AsyncStream<next_layer_type>::value,
+    static_assert(is_async_stream<next_layer_type>::value,
         "AsyncStream requirements not met");
-    beast::async_completion<
-        CloseHandler, void(error_code)
-            > completion{handler};
-    close_op<decltype(completion.handler)>{
-        completion.handler, *this, cr};
-    return completion.result.get();
+    async_completion<CloseHandler,
+        void(error_code)> init{handler};
+    close_op<handler_type<
+        CloseHandler, void(error_code)>>{
+            init.completion_handler, *this, cr};
+    return init.result.get();
 }
 
 template<class NextLayer>
@@ -217,12 +223,12 @@ void
 stream<NextLayer>::
 close(close_reason const& cr)
 {
-    static_assert(is_SyncStream<next_layer_type>::value,
+    static_assert(is_sync_stream<next_layer_type>::value,
         "SyncStream requirements not met");
     error_code ec;
     close(cr, ec);
     if(ec)
-        throw system_error{ec};
+        BOOST_THROW_EXCEPTION(system_error{ec});
 }
 
 template<class NextLayer>
@@ -230,12 +236,12 @@ void
 stream<NextLayer>::
 close(close_reason const& cr, error_code& ec)
 {
-    static_assert(is_SyncStream<next_layer_type>::value,
+    static_assert(is_sync_stream<next_layer_type>::value,
         "SyncStream requirements not met");
     BOOST_ASSERT(! wr_close_);
     wr_close_ = true;
     detail::frame_streambuf fb;
-    write_close<static_streambuf>(fb, cr);
+    write_close<static_buffer>(fb, cr);
     boost::asio::write(stream_, fb.data(), ec);
     failed_ = ec != 0;
 }
