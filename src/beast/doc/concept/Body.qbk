@@ -1,0 +1,90 @@
+[/
+    Copyright (c) 2013-2017 Vinnie Falco (vinnie dot falco at gmail dot com)
+
+    Distributed under the Boost Software License, Version 1.0. (See accompanying
+    file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+]
+
+[section:Body Body]
+
+A [*Body] type is supplied as a template argument to the __message__ class. It
+controls both the type of the data member of the resulting message object, and
+the algorithms used during parsing and serialization.
+
+In this table:
+
+* `X` is a type meeting the requirements of [*Body].
+
+* `m` is a value of type `message<b, X, F>` where `b` is a `bool` value
+  and `F` is a type meeting the requirements of [*Fields].
+
+[table Body requirements
+[[expression] [type] [semantics, pre/post-conditions]]
+[
+    [`X::value_type`]
+    []
+    [
+        The type of the `message::body` member.
+        If this is not movable or not copyable, the containing message
+        will be not movable or not copyable.
+    ]
+][
+    [`X::writer`]
+    []
+    [
+        If present, indicates that the body can hold a message body
+        parsing result. The type must meet the requirements of
+        __BodyWriter__. The implementation constructs an object of
+        this type to obtain buffers into which parsed body octets
+        are placed.
+    ]
+][
+    [`X::reader`]
+    []
+    [
+        If present, indicates that the body is serializable. The type
+        must meet the requirements of __BodyReader__. The implementation
+        constructs an object of this type to obtain buffers representing
+        the message body for serialization.
+    ]
+][
+    [`X::size(m)`]
+    [`std::uint64_t`]
+    [
+        If present, returns the serialized size of `m.body` not including
+        any chunked transfer encoding. When this function is provided,
+        [link beast.ref.http__message.prepare `message::prepare`]
+        will automatically set the content length field based on the
+        value. Otherwise, the chunked transfer encoding will be set.
+    ]
+][
+    [`is_body<X>`]
+    [`std::true_type`]
+    [
+        An alias for `std::true_type` for `X`, otherwise an alias
+        for `std::false_type`.
+    ]
+]
+]
+
+Exemplar:
+```
+struct body
+{
+    using value_type = implementation_defined;
+
+    /// The algorithm used for extracting buffers
+    class reader;
+
+    /// The algorithm used for inserting buffers
+    class writer;
+
+    /// Returns the body's payload size
+    template<bool isRequest, class Fields>
+    static
+    std::uint64_t
+    size(message<isRequest, empty_body, Fields> const& m);
+}
+```
+
+[endsect]

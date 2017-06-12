@@ -5,7 +5,9 @@
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
 
-#include <beast/core/to_string.hpp>
+//[websocket_example_client_echo
+
+#include <beast/core.hpp>
 #include <beast/websocket.hpp>
 #include <boost/asio.hpp>
 #include <iostream>
@@ -27,9 +29,10 @@ int main()
     ws.write(boost::asio::buffer(std::string("Hello, world!")));
 
     // Receive WebSocket message, print and close using beast
-    beast::streambuf sb;
-    beast::websocket::opcode op;
-    ws.read(op, sb);
+    beast::multi_buffer b;
+    ws.read(b);
     ws.close(beast::websocket::close_code::normal);
-    std::cout << beast::to_string(sb.data()) << "\n";
+    std::cout << beast::buffers(b.data()) << "\n";
 }
+
+//]

@@ -5,6 +5,9 @@
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
 
+//[http_example_get
+
+#include <beast/core.hpp>
 #include <beast/http.hpp>
 #include <boost/asio.hpp>
 #include <boost/lexical_cast.hpp>
@@ -14,7 +17,7 @@
 int main()
 {
     // Normal boost::asio setup
-    std::string const host = "boost.org";
+    std::string const host = "www.example.com";
     boost::asio::io_service ios;
     boost::asio::ip::tcp::resolver r{ios};
     boost::asio::ip::tcp::socket sock{ios};
@@ -22,19 +25,21 @@ int main()
         r.resolve(boost::asio::ip::tcp::resolver::query{host, "http"}));
 
     // Send HTTP request using beast
-    beast::http::request<beast::http::empty_body> req;
-    req.method = "GET";
-    req.url = "/";
+    beast::http::request<beast::http::string_body> req;
+    req.method(beast::http::verb::get);
+    req.target("/");
     req.version = 11;
-    req.fields.replace("Host", host + ":" +
+    req.insert(beast::http::field::host, host + ":" +
         boost::lexical_cast<std::string>(sock.remote_endpoint().port()));
-    req.fields.replace("User-Agent", "Beast");
-    beast::http::prepare(req);
+    req.insert(beast::http::field::user_agent, "Beast");
+    req.prepare();
     beast::http::write(sock, req);
 
     // Receive and print HTTP response using beast
-    beast::streambuf sb;
-    beast::http::response<beast::http::streambuf_body> resp;
-    beast::http::read(sock, sb, resp);
-    std::cout << resp;
+    beast::flat_buffer b;
+    beast::http::response<beast::http::dynamic_body> res;
+    beast::http::read(sock, b, res);
+    std::cout << res << std::endl;
 }
+
+//]

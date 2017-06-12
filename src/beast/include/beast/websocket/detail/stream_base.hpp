@@ -11,13 +11,11 @@
 #include <beast/websocket/error.hpp>
 #include <beast/websocket/option.hpp>
 #include <beast/websocket/rfc6455.hpp>
-#include <beast/websocket/detail/decorator.hpp>
 #include <beast/websocket/detail/frame.hpp>
-#include <beast/websocket/detail/invokable.hpp>
 #include <beast/websocket/detail/mask.hpp>
+#include <beast/websocket/detail/pausation.hpp>
 #include <beast/websocket/detail/pmd_extension.hpp>
 #include <beast/websocket/detail/utf8_checker.hpp>
-#include <beast/http/empty_body.hpp>
 #include <beast/http/message.hpp>
 #include <beast/http/string_body.hpp>
 #include <beast/zlib/deflate_stream.hpp>
@@ -48,18 +46,20 @@ struct stream_base
 protected:
     friend class frame_test;
 
+    using ping_callback_type =
+        std::function<void(bool, ping_data const&)>;
+
     struct op {};
 
     detail::maskgen maskgen_;               // source of mask keys
-    decorator_type d_;                      // adorns http messages
-    bool keep_alive_ = false;               // close on failed upgrade
     std::size_t rd_msg_max_ =
         16 * 1024 * 1024;                   // max message size
     bool wr_autofrag_ = true;               // auto fragment
     std::size_t wr_buf_size_ = 4096;        // write buffer size
     std::size_t rd_buf_size_ = 4096;        // read buffer size
-    opcode wr_opcode_ = opcode::text;       // outgoing message type
-    ping_cb ping_cb_;                       // ping callback
+    detail::opcode wr_opcode_ =
+        detail::opcode::text;               // outgoing message type
+    ping_callback_type ping_cb_;            // ping callback
     role_type role_;                        // server or client
     bool failed_;                           // the connection failed
 
@@ -67,9 +67,9 @@ protected:
     op* wr_block_;                          // op currenly writing
 
     ping_data* ping_data_;                  // where to put the payload
-    invokable rd_op_;                       // read parking
-    invokable wr_op_;                       // write parking
-    invokable ping_op_;                     // ping parking
+    pausation rd_op_;                       // parked read op
+    pausation wr_op_;                       // parked write op
+    pausation ping_op_;                     // parked ping op
     close_reason cr_;                       // set from received close frame
 
     // State information for the message being received
@@ -77,7 +77,7 @@ protected:
     struct rd_t
     {
         // opcode of current message being read
-        opcode op;
+        detail::opcode op;
 
         // `true` if the next frame is a continuation.
         bool cont;
@@ -154,15 +154,11 @@ protected:
     // Offer for clients, negotiated result for servers
     pmd_offer pmd_config_;
 
+    stream_base() = default;
     stream_base(stream_base&&) = default;
     stream_base(stream_base const&) = delete;
     stream_base& operator=(stream_base&&) = default;
     stream_base& operator=(stream_base const&) = delete;
-
-    stream_base()
-        : d_(detail::default_decorator{})
-    {
-    }
 
     template<class = void>
     void
@@ -175,12 +171,12 @@ protected:
     template<class DynamicBuffer>
     std::size_t
     read_fh1(detail::frame_header& fh,
-        DynamicBuffer& db, close_code::value& code);
+        DynamicBuffer& db, close_code& code);
 
     template<class DynamicBuffer>
     void
     read_fh2(detail::frame_header& fh,
-        DynamicBuffer& db, close_code::value& code);
+        DynamicBuffer& db, close_code& code);
 
     // Called before receiving the first frame of each message
     template<class = void>
@@ -199,7 +195,8 @@ protected:
 
     template<class DynamicBuffer>
     void
-    write_ping(DynamicBuffer& db, opcode op, ping_data const& data);
+    write_ping(DynamicBuffer& db,
+        detail::opcode op, ping_data const& data);
 };
 
 template<class>
@@ -264,13 +261,13 @@ template<class DynamicBuffer>
 std::size_t
 stream_base::
 read_fh1(detail::frame_header& fh,
-    DynamicBuffer& db, close_code::value& code)
+    DynamicBuffer& db, close_code& code)
 {
     using boost::asio::buffer;
     using boost::asio::buffer_copy;
     using boost::asio::buffer_size;
     auto const err =
-        [&](close_code::value cv)
+        [&](close_code cv)
         {
             code = cv;
             return 0;
@@ -290,15 +287,16 @@ read_fh1(detail::frame_header& fh,
     fh.mask = (b[1] & 0x80) != 0;
     if(fh.mask)
         need += 4;
-    fh.op   = static_cast<opcode>(b[0] & 0x0f);
+    fh.op   = static_cast<
+        detail::opcode>(b[0] & 0x0f);
     fh.fin  = (b[0] & 0x80) != 0;
     fh.rsv1 = (b[0] & 0x40) != 0;
     fh.rsv2 = (b[0] & 0x20) != 0;
     fh.rsv3 = (b[0] & 0x10) != 0;
     switch(fh.op)
     {
-    case opcode::binary:
-    case opcode::text:
+    case detail::opcode::binary:
+    case detail::opcode::text:
         if(rd_.cont)
         {
             // new data frame when continuation expected
@@ -314,7 +312,7 @@ read_fh1(detail::frame_header& fh,
             pmd_->rd_set = fh.rsv1;
         break;
 
-    case opcode::cont:
+    case detail::opcode::cont:
         if(! rd_.cont)
         {
             // continuation without an active message
@@ -372,7 +370,7 @@ template<class DynamicBuffer>
 void
 stream_base::
 read_fh2(detail::frame_header& fh,
-    DynamicBuffer& db, close_code::value& code)
+    DynamicBuffer& db, close_code& code)
 {
     using boost::asio::buffer;
     using boost::asio::buffer_copy;
@@ -423,7 +421,7 @@ read_fh2(detail::frame_header& fh,
     }
     if(! is_control(fh.op))
     {
-        if(fh.op != opcode::cont)
+        if(fh.op != detail::opcode::cont)
         {
             rd_.size = 0;
             rd_.op = fh.op;
@@ -490,7 +488,7 @@ write_close(DynamicBuffer& db, close_reason const& cr)
 {
     using namespace boost::endian;
     frame_header fh;
-    fh.op = opcode::close;
+    fh.op = detail::opcode::close;
     fh.fin = true;
     fh.rsv1 = false;
     fh.rsv2 = false;
@@ -533,8 +531,8 @@ write_close(DynamicBuffer& db, close_reason const& cr)
 template<class DynamicBuffer>
 void
 stream_base::
-write_ping(
-    DynamicBuffer& db, opcode op, ping_data const& data)
+write_ping(DynamicBuffer& db,
+    detail::opcode op, ping_data const& data)
 {
     frame_header fh;
     fh.op = op;

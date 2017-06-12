@@ -10,8 +10,15 @@
 
 #include <beast/config.hpp>
 #include <beast/http/fields.hpp>
+#include <beast/http/verb.hpp>
+#include <beast/http/status.hpp>
+#include <beast/http/type_traits.hpp>
+#include <beast/core/string_view.hpp>
 #include <beast/core/detail/integer_sequence.hpp>
+#include <boost/optional.hpp>
+#include <boost/throw_exception.hpp>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -19,8 +26,7 @@
 namespace beast {
 namespace http {
 
-#if GENERATING_DOCS
-/** A container for a HTTP request or response header.
+/** A container for an HTTP request or response header.
 
     A header includes the Start Line and Fields.
 
@@ -32,53 +38,34 @@ namespace http {
 
     @li Invoke algorithms which operate on the header only.
 */
-template<bool isRequest, class Fields>
+#if BEAST_DOXYGEN
+template<bool isRequest, class Fields = fields>
 struct header
 
 #else
-template<bool isRequest, class Fields>
+template<bool isRequest, class Fields = fields>
 struct header;
 
 template<class Fields>
-struct header<true, Fields>
+struct header<true, Fields> : Fields
 #endif
 {
     /// Indicates if the header is a request or response.
-#if GENERATING_DOCS
-    static bool constexpr is_request = isRequest;
-
-#else
-    static bool constexpr is_request = true;
-#endif
+    using is_request = std::true_type;
 
     /// The type representing the fields.
     using fields_type = Fields;
 
-    /** The HTTP version.
+    /** The HTTP-version.
 
         This holds both the major and minor version numbers,
         using these formulas:
         @code
-            major = version / 10;
-            minor = version % 10;
+            int major = version / 10;
+            int minor = version % 10;
         @endcode
     */
     int version;
-
-    /** The Request Method
-
-        @note This field is present only if `isRequest == true`.
-    */
-    std::string method;
-
-    /** The Request URI
-
-        @note This field is present only if `isRequest == true`.
-    */
-    std::string url;
-
-    /// The HTTP field values.
-    fields_type fields;
 
     /// Default constructor
     header() = default;
@@ -104,7 +91,7 @@ struct header<true, Fields>
         if and only if the first parameter is not convertible to
         `header`.
     */
-#if GENERATING_DOCS
+#if BEAST_DOXYGEN
     template<class... Args>
     explicit
     header(Args&&... args);
@@ -116,14 +103,86 @@ struct header<true, Fields>
                 typename std::decay<Arg1>::type,
                     header>::value>::type>
     explicit
-    header(Arg1&& arg1, ArgN&&... argn)
-        : fields(std::forward<Arg1>(arg1),
-            std::forward<ArgN>(argn)...)
-    {
-    }
+    header(Arg1&& arg1, ArgN&&... argn);
+
+    /** Return the request-method verb.
+
+        If the request-method is not one of the recognized verbs,
+        @ref verb::unknown is returned. Callers may use @ref method_string
+        to retrieve the exact text.
+
+        @note This function is only available when `isRequest == true`.
+
+        @see @ref method_string
+    */
+    verb
+    method() const;
+
+    /** Set the request-method.
+
+        This function will set the method for requests to a known verb.
+
+        @param v The request method verb to set.
+        This may not be @ref verb::unknown.
+
+        @throws std::invalid_argument when `v == verb::unknown`.
+
+        @note This function is only available when `isRequest == true`.
+    */
+    void
+    method(verb v);
+
+    /** Return the request-method as a string.
+
+        @note This function is only available when `isRequest == true`.
+
+        @see @ref method
+    */
+    string_view
+    method_string() const;
+
+    /** Set the request-method.
+
+        This function will set the request-method a known verb
+        if the string matches, otherwise it will store a copy of
+        the passed string.
+
+        @param s A string representing the request-method.
+
+        @note This function is only available when `isRequest == true`.
+    */
+    void
+    method_string(string_view s);
+
+    /** Returns the request-target string.
+
+        @note This function is only available when `isRequest == true`.
+    */
+    string_view
+    target() const;
+
+    /** Set the request-target string.
+
+        @param s A string representing the request-target.
+
+        @note This function is only available when `isRequest == true`.
+    */
+    void
+    target(string_view s);
+
+private:
+    template<bool, class, class>
+    friend struct message;
+
+    template<class T>
+    friend
+    void
+    swap(header<true, T>& m1, header<true, T>& m2);
+
+    verb method_ = verb::unknown;
 };
 
-/** A container for a HTTP request or response header.
+/** A container for an HTTP request or response header.
 
     A header includes the Start Line and Fields.
 
@@ -136,10 +195,10 @@ struct header<true, Fields>
     @li Invoke algorithms which operate on the header only.
 */
 template<class Fields>
-struct header<false, Fields>
+struct header<false, Fields> : Fields
 {
     /// Indicates if the header is a request or response.
-    static bool constexpr is_request = false;
+    using is_request = std::false_type;
 
     /// The type representing the fields.
     using fields_type = Fields;
@@ -155,10 +214,7 @@ struct header<false, Fields>
     */
     int version;
 
-    /// The HTTP field values.
-    fields_type fields;
-
-    /// Default constructor
+    /// Default constructor.
     header() = default;
 
     /// Move constructor
@@ -188,26 +244,94 @@ struct header<false, Fields>
                 typename std::decay<Arg1>::type,
                     header>::value>::type>
     explicit
-    header(Arg1&& arg1, ArgN&&... argn)
-        : fields(std::forward<Arg1>(arg1),
-            std::forward<ArgN>(argn)...)
-    {
-    }
+    header(Arg1&& arg1, ArgN&&... argn);
 #endif
 
-    /** The Response Status-Code.
+    /** The response status-code result.
 
-        @note This field is present only if `isRequest == false`.
+        If the actual status code is not a known code, this
+        function returns @ref status::unknown. Use @ref result_int
+        to return the raw status code as a number.
+
+        @note This member is only available when `isRequest == false`.
     */
-    int status;
+    status
+    result() const;
 
-    /** The Response Reason-Phrase.
+    /** Set the response status-code.
 
-        The Reason-Phrase is obsolete as of rfc7230.
+        @param v The code to set.
 
-        @note This field is present only if `isRequest == false`.
+        @note This member is only available when `isRequest == false`.
     */
-    std::string reason;
+    void
+    result(status v);
+
+    /** Set the response status-code as an integer.
+
+        This sets the status code to the exact number passed in.
+        If the number does not correspond to one of the known
+        status codes, the function @ref result will return
+        @ref status::unknown. Use @ref result_int to obtain the
+        original raw status-code.
+
+        @param v The status-code integer to set.
+
+        @throws std::invalid_argument if `v > 999`.
+    */
+    void
+    result(unsigned v);
+
+    /** The response status-code expressed as an integer.
+
+        This returns the raw status code as an integer, even
+        when that code is not in the list of known status codes.
+
+        @note This member is only available when `isRequest == false`.
+    */
+    unsigned
+    result_int() const;
+
+    /** Return the response reason-phrase.
+
+        The reason-phrase is obsolete as of rfc7230.
+
+        @note This function is only available when `isRequest == false`.
+    */
+    string_view
+    reason() const;
+
+    /** Set the response reason-phrase (deprecated)
+
+        This function sets a custom reason-phrase to a copy of
+        the string passed in. Normally it is not necessary to set
+        the reason phrase on an outgoing response object; the
+        implementation will automatically use the standard reason
+        text for the corresponding status code.
+
+        To clear a previously set custom phrase, pass an empty
+        string. This will restore the default standard reason text
+        based on the status code used when serializing.
+
+        The reason-phrase is obsolete as of rfc7230.
+
+        @param s The string to use for the reason-phrase.
+
+        @note This function is only available when `isRequest == false`.
+    */
+    void
+    reason(string_view s);
+   
+private:
+    template<bool, class, class>
+    friend struct message;
+
+    template<class T>
+    friend
+    void
+    swap(header<false, T>& m1, header<false, T>& m2);
+
+    status result_;
 };
 
 /** A container for a complete HTTP message.
@@ -229,11 +353,11 @@ struct header<false, Fields>
     @tparam Fields The type of container used to hold the
     field value pairs.
 */
-template<bool isRequest, class Body, class Fields>
+template<bool isRequest, class Body, class Fields = fields>
 struct message : header<isRequest, Fields>
 {
     /// The base class used to hold the header portion of the message.
-    using base_type = header<isRequest, Fields>;
+    using header_type = header<isRequest, Fields>;
 
     /** The type providing the body traits.
 
@@ -259,51 +383,44 @@ struct message : header<isRequest, Fields>
     /// Copy assignment
     message& operator=(message const&) = default;
 
-    /** Construct a message from a header.
+    /** Constructor.
 
-        Additional arguments, if any, are forwarded to
-        the constructor of the body member.
+        @param h The header to move construct from.
+
+        @param args Optional arguments forwarded
+        to the body constructor.
     */
     template<class... Args>
     explicit
-    message(base_type&& base, Args&&... args)
-        : base_type(std::move(base))
-        , body(std::forward<Args>(args)...)
-    {
-    }
+    message(header_type&& h, Args&&... args);
 
-    /** Construct a message from a header.
+    /** Constructor.
 
-        Additional arguments, if any, are forwarded to
-        the constructor of the body member.
+        @param h The header to copy construct from.
+
+        @param args Optional arguments forwarded
+        to the body constructor.
     */
     template<class... Args>
     explicit
-    message(base_type const& base, Args&&... args)
-        : base_type(base)
-        , body(std::forward<Args>(args)...)
-    {
-    }
+    message(header_type const& h, Args&&... args);
 
     /** Construct a message.
 
         @param u An argument forwarded to the body constructor.
 
         @note This constructor participates in overload resolution
-        only if `u` is not convertible to `base_type`.
+        only if `u` is not convertible to `header_type`.
     */
     template<class U
-#if ! GENERATING_DOCS
+#if ! BEAST_DOXYGEN
         , class = typename std::enable_if<
             ! std::is_convertible<typename
-                std::decay<U>::type, base_type>::value>::type
+                std::decay<U>::type, header_type>::value>::type
 #endif
     >
     explicit
-    message(U&& u)
-        : body(std::forward<U>(u))
-    {
-    }
+    message(U&& u);
 
     /** Construct a message.
 
@@ -312,30 +429,22 @@ struct message : header<isRequest, Fields>
         @param v An argument forwarded to the fields constructor.
 
         @note This constructor participates in overload resolution
-        only if `u` is not convertible to `base_type`.
+        only if `u` is not convertible to `header_type`.
     */
     template<class U, class V
-#if ! GENERATING_DOCS
+#if ! BEAST_DOXYGEN
         ,class = typename std::enable_if<! std::is_convertible<
-            typename std::decay<U>::type, base_type>::value>::type
+            typename std::decay<U>::type, header_type>::value>::type
 #endif
     >
-    message(U&& u, V&& v)
-        : base_type(std::forward<V>(v))
-        , body(std::forward<U>(u))
-    {
-    }
+    message(U&& u, V&& v);
 
     /** Construct a message.
 
         @param un A tuple forwarded as a parameter pack to the body constructor.
     */
     template<class... Un>
-    message(std::piecewise_construct_t, std::tuple<Un...> un)
-        : message(std::piecewise_construct, un,
-            beast::detail::make_index_sequence<sizeof...(Un)>{})
-    {
-    }
+    message(std::piecewise_construct_t, std::tuple<Un...> un);
 
     /** Construct a message.
 
@@ -345,31 +454,79 @@ struct message : header<isRequest, Fields>
     */
     template<class... Un, class... Vn>
     message(std::piecewise_construct_t,
-            std::tuple<Un...>&& un, std::tuple<Vn...>&& vn)
-        : message(std::piecewise_construct, un, vn,
-            beast::detail::make_index_sequence<sizeof...(Un)>{},
-            beast::detail::make_index_sequence<sizeof...(Vn)>{})
-    {
-    }
+            std::tuple<Un...>&& un, std::tuple<Vn...>&& vn);
 
-    /// Returns the header portion of the message
-    base_type&
-    base()
-    {
-        return *this;
-    }
+    /// Returns `true` if "close" is specified in the Connection field.
+    bool
+    has_close() const;
 
-    /// Returns the header portion of the message
-    base_type const&
-    base() const
-    {
-        return *this;
-    }
+    /// Returns `true` if "chunked" is the last Transfer-Encoding.
+    bool
+    has_chunked() const;
+
+    /** Returns `true` if the Content-Length field is present.
+
+        This function checks the fields to determine if the content
+        length field is present, regardless of the actual value.
+
+        @note The contents of the body payload are not inspected.
+    */
+    bool
+    has_content_length() const;
+
+    /** Returns the payload size of the body in octets if possible.
+
+        This function invokes the @b Body algorithm to measure
+        the number of octets in the serialized body container. If
+        there is no body, this will return zero. Otherwise, if the
+        body exists but is not known ahead of time, `boost::none`
+        is returned (usually indicating that a chunked Transfer-Encoding
+        will be used).
+
+        @note The value of the Content-Length field in the message
+        is not inspected.
+    */
+    boost::optional<std::uint64_t>
+    size() const;
+
+    /** Set the Content-Length field.
+
+        The value of the Content-Length field will be unconditionally
+        set to the specified number of octets.
+
+        @par n The number of octets to set for the Content-Length field.
+    */
+    void
+    content_length(std::uint64_t n);
+
+    /** Prepare the message payload fields for the body.
+
+        This function will adjust the Content-Length and
+        Transfer-Encoding field values based on the properties
+        of the body.
+
+        @par Example
+        @code
+        request<string_body> req;
+        req.version = 11;
+        req.method(verb::upgrade);
+        req.target("/");
+        req.insert(field::user_agent, "Beast");
+        req.body = "Hello, world!";
+        req.prepare();
+        @endcode
+    */
+    void
+    prepare();
 
 private:
+    static_assert(is_body<Body>::value,
+        "Body requirements not met");
+
     template<class... Un, size_t... IUn>
     message(std::piecewise_construct_t,
-            std::tuple<Un...>& tu, beast::detail::index_sequence<IUn...>)
+        std::tuple<Un...>& tu,
+            beast::detail::index_sequence<IUn...>)
         : body(std::forward<Un>(std::get<IUn>(tu))...)
     {
     }
@@ -380,15 +537,41 @@ private:
             std::tuple<Un...>& tu, std::tuple<Vn...>& tv,
                 beast::detail::index_sequence<IUn...>,
                     beast::detail::index_sequence<IVn...>)
-        : base_type(std::forward<Vn>(std::get<IVn>(tv))...)
+        : header_type(std::forward<Vn>(std::get<IVn>(tv))...)
         , body(std::forward<Un>(std::get<IUn>(tu))...)
     {
     }
+
+    boost::optional<std::uint64_t>
+    size(std::true_type) const
+    {
+        return Body::size(*this);
+    }
+
+    boost::optional<std::uint64_t>
+    size(std::false_type) const
+    {
+        return boost::none;
+    }
+
+    void
+    prepare(std::true_type);
+
+    void
+    prepare(std::false_type);
 };
+
+/// A typical HTTP request
+template<class Body, class Fields = fields>
+using request = message<true, Body, Fields>;
+
+/// A typical HTTP response
+template<class Body, class Fields = fields>
+using response = message<false, Body, Fields>;
 
 //------------------------------------------------------------------------------
 
-#if GENERATING_DOCS
+#if BEAST_DOXYGEN
 /** Swap two header objects.
 
     @par Requirements
@@ -411,71 +594,6 @@ void
 swap(
     message<isRequest, Body, Fields>& m1,
     message<isRequest, Body, Fields>& m2);
-
-/// A typical HTTP request header
-using request_header = header<true, fields>;
-
-/// Typical HTTP response header
-using response_header = header<false, fields>;
-
-/// A typical HTTP request
-template<class Body, class Fields = fields>
-using request = message<true, Body, Fields>;
-
-/// A typical HTTP response
-template<class Body, class Fields = fields>
-using response = message<false, Body, Fields>;
-
-//------------------------------------------------------------------------------
-
-/** Returns `true` if the HTTP/1 message indicates a keep alive.
-
-    Undefined behavior if version is greater than 11.
-*/
-template<bool isRequest, class Fields>
-bool
-is_keep_alive(header<isRequest, Fields> const& msg);
-
-/** Returns `true` if the HTTP/1 message indicates an Upgrade request or response.
-
-    Undefined behavior if version is greater than 11.
-*/
-template<bool isRequest, class Fields>
-bool
-is_upgrade(header<isRequest, Fields> const& msg);
-
-/** HTTP/1 connection prepare options.
-
-    @note These values are used with @ref prepare.
-*/
-enum class connection
-{
-    /// Specify Connection: close.
-    close,
-
-    /// Specify Connection: keep-alive where possible.
-    keep_alive,
-
-    /// Specify Connection: upgrade.
-    upgrade
-};
-
-/** Prepare a HTTP message.
-
-    This function will adjust the Content-Length, Transfer-Encoding,
-    and Connection fields of the message based on the properties of
-    the body and the options passed in.
-
-    @param msg The message to prepare. The fields may be modified.
-
-    @param options A list of prepare options.
-*/
-template<
-    bool isRequest, class Body, class Fields,
-    class... Options>
-void
-prepare(message<isRequest, Body, Fields>& msg,
-    Options&&... options);
 
 } // http
 } // beast

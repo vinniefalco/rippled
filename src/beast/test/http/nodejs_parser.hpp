@@ -12,10 +12,11 @@
 
 #include <beast/http/message.hpp>
 #include <beast/http/rfc7230.hpp>
-#include <beast/core/buffer_concepts.hpp>
 #include <beast/core/error.hpp>
+#include <beast/core/type_traits.hpp>
 #include <boost/asio/buffer.hpp>
 #include <boost/system/error_code.hpp>
+#include <boost/throw_exception.hpp>
 #include <cstdint>
 #include <string>
 #include <type_traits>
@@ -174,7 +175,7 @@ public:
         error_code ec;
         auto const used = write(data, size, ec);
         if(ec)
-            throw system_error{ec};
+            BOOST_THROW_EXCEPTION(system_error{ec});
         return used;
     }
 
@@ -189,7 +190,7 @@ public:
         error_code ec;
         auto const used = write(buffers, ec);
         if(ec)
-            throw system_error{ec};
+            BOOST_THROW_EXCEPTION(system_error{ec});
         return used;
     }
 
@@ -204,7 +205,7 @@ public:
         error_code ec;
         write_eof(ec);
         if(ec)
-            throw system_error{ec};
+            BOOST_THROW_EXCEPTION(system_error{ec});
     }
 
     void
@@ -482,7 +483,7 @@ std::size_t
 nodejs_basic_parser<Derived>::write(
     ConstBufferSequence const& buffers, error_code& ec)
 {
-    static_assert(beast::is_ConstBufferSequence<
+    static_assert(beast::is_const_buffer_sequence<
         ConstBufferSequence>::value,
             "ConstBufferSequence requirements not met");
     using boost::asio::buffer_cast;
@@ -740,11 +741,6 @@ template<bool isRequest, class Body, class Fields>
 class nodejs_parser
     : public nodejs_basic_parser<nodejs_parser<isRequest, Body, Fields>>
 {
-    using message_type =
-        message<isRequest, Body, Fields>;
-
-    message_type m_;
-    typename message_type::body_type::reader r_;
     bool started_ = false;
 
 public:
@@ -752,7 +748,6 @@ public:
 
     nodejs_parser()
         : http::nodejs_basic_parser<nodejs_parser>(isRequest)
-        , r_(m_)
     {
     }
 
@@ -761,12 +756,6 @@ public:
     started()
     {
         return started_;
-    }
-
-    message_type
-    release()
-    {
-        return std::move(m_);
     }
 
 private:
@@ -781,7 +770,6 @@ private:
     void
     on_field(std::string const& field, std::string const& value)
     {
-        m_.fields.insert(field, value);
     }
 
     void
@@ -798,9 +786,6 @@ private:
         int major, int minor, bool /*keep_alive*/, bool /*upgrade*/,
             std::true_type)
     {
-        m_.method = detail::method_to_string(method);
-        m_.url = url;
-        m_.version = major * 10 + minor;
         return true;
     }
 
@@ -819,7 +804,7 @@ private:
         return on_request(method, url,
             major, minor, keep_alive, upgrade,
                 std::integral_constant<
-                    bool,  message_type::is_request>{});
+                    bool, isRequest>{});
     }
 
     bool
@@ -828,10 +813,6 @@ private:
             std::true_type)
     {
         beast::detail::ignore_unused(keep_alive, upgrade);
-        m_.status = status;
-        m_.reason = reason;
-        m_.version = major * 10 + minor;
-        // VFALCO TODO return expect_body_
         return true;
     }
 
@@ -848,14 +829,13 @@ private:
     {
         return on_response(
             status, reason, major, minor, keep_alive, upgrade,
-                std::integral_constant<bool, ! message_type::is_request>{});
+                std::integral_constant<bool, ! isRequest>{});
     }
 
     void
     on_body(void const* data,
         std::size_t size, error_code& ec)
     {
-        r_.write(data, size, ec);
     }
 
     void

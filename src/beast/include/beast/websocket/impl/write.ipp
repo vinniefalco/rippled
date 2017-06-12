@@ -10,16 +10,19 @@
 
 #include <beast/core/bind_handler.hpp>
 #include <beast/core/buffer_cat.hpp>
-#include <beast/core/buffer_concepts.hpp>
+#include <beast/core/buffer_prefix.hpp>
 #include <beast/core/consuming_buffers.hpp>
-#include <beast/core/handler_helpers.hpp>
 #include <beast/core/handler_ptr.hpp>
-#include <beast/core/prepare_buffers.hpp>
-#include <beast/core/static_streambuf.hpp>
-#include <beast/core/stream_concepts.hpp>
+#include <beast/core/static_buffer.hpp>
+#include <beast/core/type_traits.hpp>
 #include <beast/core/detail/clamp.hpp>
 #include <beast/websocket/detail/frame.hpp>
+#include <boost/asio/handler_alloc_hook.hpp>
+#include <boost/asio/handler_continuation_hook.hpp>
+#include <boost/asio/handler_invoke_hook.hpp>
 #include <boost/assert.hpp>
+#include <boost/config.hpp>
+#include <boost/throw_exception.hpp>
 #include <algorithm>
 #include <memory>
 
@@ -32,7 +35,6 @@ class stream<NextLayer>::write_frame_op
 {
     struct data : op
     {
-        Handler& handler;
         bool cont;
         stream<NextLayer>& ws;
         consuming_buffers<Buffers> cb;
@@ -44,15 +46,14 @@ class stream<NextLayer>::write_frame_op
         int state = 0;
         int entry_state;
 
-        data(Handler& handler_, stream<NextLayer>& ws_,
+        data(Handler& handler, stream<NextLayer>& ws_,
                 bool fin_, Buffers const& bs)
-            : handler(handler_)
-            , cont(beast_asio_helpers::
-                is_continuation(handler))
-            , ws(ws_)
+            : ws(ws_)
             , cb(bs)
             , fin(fin_)
         {
+            using boost::asio::asio_handler_is_continuation;
+            cont = asio_handler_is_continuation(std::addressof(handler));
         }
     };
 
@@ -91,16 +92,18 @@ public:
     void* asio_handler_allocate(
         std::size_t size, write_frame_op* op)
     {
-        return beast_asio_helpers::
-            allocate(size, op->d_.handler());
+        using boost::asio::asio_handler_allocate;
+        return asio_handler_allocate(
+            size, std::addressof(op->d_.handler()));
     }
 
     friend
     void asio_handler_deallocate(
         void* p, std::size_t size, write_frame_op* op)
     {
-        return beast_asio_helpers::
-            deallocate(p, size, op->d_.handler());
+        using boost::asio::asio_handler_deallocate;
+        asio_handler_deallocate(
+            p, size, std::addressof(op->d_.handler()));
     }
 
     friend
@@ -113,8 +116,9 @@ public:
     friend
     void asio_handler_invoke(Function&& f, write_frame_op* op)
     {
-        return beast_asio_helpers::
-            invoke(f, op->d_.handler());
+        using boost::asio::asio_handler_invoke;
+        asio_handler_invoke(
+            f, std::addressof(op->d_.handler()));
     }
 };
 
@@ -175,7 +179,7 @@ operator()(error_code ec,
             d.fh.rsv2 = false;
             d.fh.rsv3 = false;
             d.fh.op = d.ws.wr_.cont ?
-                opcode::cont : d.ws.wr_opcode_;
+                detail::opcode::cont : d.ws.wr_opcode_;
             d.fh.mask =
                 d.ws.role_ == detail::role_type::client;
 
@@ -227,14 +231,14 @@ operator()(error_code ec,
         case do_nomask_nofrag:
             BOOST_ASSERT(! d.ws.wr_block_);
             d.ws.wr_block_ = &d;
-            // [[fallthrough]]
+            BOOST_FALLTHROUGH;
 
         case do_nomask_nofrag + 1:
         {
             BOOST_ASSERT(d.ws.wr_block_ == &d);
             d.fh.fin = d.fin;
             d.fh.len = buffer_size(d.cb);
-            detail::write<static_streambuf>(
+            detail::write<static_buffer>(
                 d.fh_buf, d.fh);
             d.ws.wr_.cont = ! d.fin;
             // Send frame
@@ -250,7 +254,7 @@ operator()(error_code ec,
         case do_nomask_frag:
             BOOST_ASSERT(! d.ws.wr_block_);
             d.ws.wr_block_ = &d;
-            // [[fallthrough]]
+            BOOST_FALLTHROUGH;
 
         case do_nomask_frag + 1:
         {
@@ -260,7 +264,7 @@ operator()(error_code ec,
             d.remain -= n;
             d.fh.len = n;
             d.fh.fin = d.fin ? d.remain == 0 : false;
-            detail::write<static_streambuf>(
+            detail::write<static_buffer>(
                 d.fh_buf, d.fh);
             d.ws.wr_.cont = ! d.fin;
             // Send frame
@@ -268,7 +272,7 @@ operator()(error_code ec,
                 do_upcall : do_nomask_frag + 2;
             boost::asio::async_write(d.ws.stream_,
                 buffer_cat(d.fh_buf.data(),
-                    prepare_buffers(n, d.cb)),
+                    buffer_prefix(n, d.cb)),
                         std::move(*this));
             return;
         }
@@ -276,8 +280,8 @@ operator()(error_code ec,
         case do_nomask_frag + 2:
             d.cb.consume(
                 bytes_transferred - d.fh_buf.size());
-            d.fh_buf.reset();
-            d.fh.op = opcode::cont;
+            d.fh_buf.consume(d.fh_buf.size());
+            d.fh.op = detail::opcode::cont;
             if(d.ws.wr_block_ == &d)
                 d.ws.wr_block_ = nullptr;
             // Allow outgoing control frames to
@@ -298,7 +302,7 @@ operator()(error_code ec,
         case do_mask_nofrag:
             BOOST_ASSERT(! d.ws.wr_block_);
             d.ws.wr_block_ = &d;
-            // [[fallthrough]]
+            BOOST_FALLTHROUGH;
 
         case do_mask_nofrag + 1:
         {
@@ -308,7 +312,7 @@ operator()(error_code ec,
             d.fh.len = d.remain;
             d.fh.key = d.ws.maskgen_();
             detail::prepare_key(d.key, d.fh.key);
-            detail::write<static_streambuf>(
+            detail::write<static_buffer>(
                 d.fh_buf, d.fh);
             auto const n =
                 clamp(d.remain, d.ws.wr_.buf_size);
@@ -350,7 +354,7 @@ operator()(error_code ec,
         case do_mask_frag:
             BOOST_ASSERT(! d.ws.wr_block_);
             d.ws.wr_block_ = &d;
-            // [[fallthrough]]
+            BOOST_FALLTHROUGH;
 
         case do_mask_frag + 1:
         {
@@ -366,7 +370,7 @@ operator()(error_code ec,
                 d.ws.wr_.buf.get(), n);
             buffer_copy(b, d.cb);
             detail::mask_inplace(b, d.key);
-            detail::write<static_streambuf>(
+            detail::write<static_buffer>(
                 d.fh_buf, d.fh);
             d.ws.wr_.cont = ! d.fin;
             // Send frame
@@ -381,8 +385,8 @@ operator()(error_code ec,
         case do_mask_frag + 2:
             d.cb.consume(
                 bytes_transferred - d.fh_buf.size());
-            d.fh_buf.reset();
-            d.fh.op = opcode::cont;
+            d.fh_buf.consume(d.fh_buf.size());
+            d.fh.op = detail::opcode::cont;
             BOOST_ASSERT(d.ws.wr_block_ == &d);
             d.ws.wr_block_ = nullptr;
             // Allow outgoing control frames to
@@ -403,7 +407,7 @@ operator()(error_code ec,
         case do_deflate:
             BOOST_ASSERT(! d.ws.wr_block_);
             d.ws.wr_block_ = &d;
-            // [[fallthrough]]
+            BOOST_FALLTHROUGH;
 
         case do_deflate + 1:
         {
@@ -442,7 +446,7 @@ operator()(error_code ec,
             d.fh.fin = ! more;
             d.fh.len = n;
             detail::fh_streambuf fh_buf;
-            detail::write<static_streambuf>(fh_buf, d.fh);
+            detail::write<static_buffer>(fh_buf, d.fh);
             d.ws.wr_.cont = ! d.fin;
             // Send frame
             d.state = more ?
@@ -454,7 +458,7 @@ operator()(error_code ec,
         }
 
         case do_deflate + 2:
-            d.fh.op = opcode::cont;
+            d.fh.op = detail::opcode::cont;
             d.fh.rsv1 = false;
             BOOST_ASSERT(d.ws.wr_block_ == &d);
             d.ws.wr_block_ = nullptr;
@@ -488,8 +492,7 @@ operator()(error_code ec,
             {
                 // suspend
                 d.state = do_maybe_suspend + 1;
-                d.ws.wr_op_.template emplace<
-                    write_frame_op>(std::move(*this));
+                d.ws.wr_op_.emplace(std::move(*this));
                 return;
             }
             if(d.ws.failed_ || d.ws.wr_close_)
@@ -545,24 +548,23 @@ upcall:
 
 template<class NextLayer>
 template<class ConstBufferSequence, class WriteHandler>
-typename async_completion<
-    WriteHandler, void(error_code)>::result_type
+async_return_type<
+    WriteHandler, void(error_code)>
 stream<NextLayer>::
 async_write_frame(bool fin,
     ConstBufferSequence const& bs, WriteHandler&& handler)
 {
-    static_assert(is_AsyncStream<next_layer_type>::value,
+    static_assert(is_async_stream<next_layer_type>::value,
         "AsyncStream requirements not met");
-    static_assert(beast::is_ConstBufferSequence<
+    static_assert(beast::is_const_buffer_sequence<
         ConstBufferSequence>::value,
             "ConstBufferSequence requirements not met");
-    beast::async_completion<
-        WriteHandler, void(error_code)
-            > completion{handler};
-    write_frame_op<ConstBufferSequence, decltype(
-        completion.handler)>{completion.handler,
+    async_completion<WriteHandler,
+        void(error_code)> init{handler};
+    write_frame_op<ConstBufferSequence, handler_type<
+        WriteHandler, void(error_code)>>{init.completion_handler,
             *this, fin, bs};
-    return completion.result.get();
+    return init.result.get();
 }
 
 template<class NextLayer>
@@ -571,15 +573,15 @@ void
 stream<NextLayer>::
 write_frame(bool fin, ConstBufferSequence const& buffers)
 {
-    static_assert(is_SyncStream<next_layer_type>::value,
+    static_assert(is_sync_stream<next_layer_type>::value,
         "SyncStream requirements not met");
-    static_assert(beast::is_ConstBufferSequence<
+    static_assert(beast::is_const_buffer_sequence<
         ConstBufferSequence>::value,
             "ConstBufferSequence requirements not met");
     error_code ec;
     write_frame(fin, buffers, ec);
     if(ec)
-        throw system_error{ec};
+        BOOST_THROW_EXCEPTION(system_error{ec});
 }
 
 template<class NextLayer>
@@ -589,9 +591,9 @@ stream<NextLayer>::
 write_frame(bool fin,
     ConstBufferSequence const& buffers, error_code& ec)
 {
-    static_assert(is_SyncStream<next_layer_type>::value,
+    static_assert(is_sync_stream<next_layer_type>::value,
         "SyncStream requirements not met");
-    static_assert(beast::is_ConstBufferSequence<
+    static_assert(beast::is_const_buffer_sequence<
         ConstBufferSequence>::value,
             "ConstBufferSequence requirements not met");
     using beast::detail::clamp;
@@ -610,7 +612,8 @@ write_frame(bool fin,
     }
     fh.rsv2 = false;
     fh.rsv3 = false;
-    fh.op = wr_.cont ? opcode::cont : wr_opcode_;
+    fh.op = wr_.cont ?
+        detail::opcode::cont : wr_opcode_;
     fh.mask = role_ == detail::role_type::client;
     auto remain = buffer_size(buffers);
     if(wr_.compress)
@@ -647,7 +650,7 @@ write_frame(bool fin,
             fh.fin = ! more;
             fh.len = n;
             detail::fh_streambuf fh_buf;
-            detail::write<static_streambuf>(fh_buf, fh);
+            detail::write<static_buffer>(fh_buf, fh);
             wr_.cont = ! fin;
             boost::asio::write(stream_,
                 buffer_cat(fh_buf.data(), b), ec);
@@ -656,7 +659,7 @@ write_frame(bool fin,
                 return;
             if(! more)
                 break;
-            fh.op = opcode::cont;
+            fh.op = detail::opcode::cont;
             fh.rsv1 = false;
         }
         if(fh.fin && (
@@ -675,7 +678,7 @@ write_frame(bool fin,
             fh.fin = fin;
             fh.len = remain;
             detail::fh_streambuf fh_buf;
-            detail::write<static_streambuf>(fh_buf, fh);
+            detail::write<static_buffer>(fh_buf, fh);
             wr_.cont = ! fin;
             boost::asio::write(stream_,
                 buffer_cat(fh_buf.data(), buffers), ec);
@@ -696,17 +699,17 @@ write_frame(bool fin,
                 fh.len = n;
                 fh.fin = fin ? remain == 0 : false;
                 detail::fh_streambuf fh_buf;
-                detail::write<static_streambuf>(fh_buf, fh);
+                detail::write<static_buffer>(fh_buf, fh);
                 wr_.cont = ! fin;
                 boost::asio::write(stream_,
                     buffer_cat(fh_buf.data(),
-                        prepare_buffers(n, cb)), ec);
+                        buffer_prefix(n, cb)), ec);
                 failed_ = ec != 0;
                 if(failed_)
                     return;
                 if(remain == 0)
                     break;
-                fh.op = opcode::cont;
+                fh.op = detail::opcode::cont;
                 cb.consume(n);
             }
         }
@@ -721,7 +724,7 @@ write_frame(bool fin,
         detail::prepared_key key;
         detail::prepare_key(key, fh.key);
         detail::fh_streambuf fh_buf;
-        detail::write<static_streambuf>(fh_buf, fh);
+        detail::write<static_buffer>(fh_buf, fh);
         consuming_buffers<
             ConstBufferSequence> cb{buffers};
         {
@@ -772,7 +775,7 @@ write_frame(bool fin,
             fh.fin = fin ? remain == 0 : false;
             wr_.cont = ! fh.fin;
             detail::fh_streambuf fh_buf;
-            detail::write<static_streambuf>(fh_buf, fh);
+            detail::write<static_buffer>(fh_buf, fh);
             boost::asio::write(stream_,
                 buffer_cat(fh_buf.data(), b), ec);
             failed_ = ec != 0;
@@ -780,7 +783,7 @@ write_frame(bool fin,
                 return;
             if(remain == 0)
                 break;
-            fh.op = opcode::cont;
+            fh.op = detail::opcode::cont;
             cb.consume(n);
         }
         return;
@@ -803,12 +806,12 @@ class stream<NextLayer>::write_op
 
         data(Handler& handler, stream<NextLayer>& ws_,
                 Buffers const& bs)
-            : cont(beast_asio_helpers::
-                is_continuation(handler))
-            , ws(ws_)
+            : ws(ws_)
             , cb(bs)
             , remain(boost::asio::buffer_size(cb))
         {
+            using boost::asio::asio_handler_is_continuation;
+            cont = asio_handler_is_continuation(std::addressof(handler));
         }
     };
 
@@ -834,16 +837,18 @@ public:
     void* asio_handler_allocate(
         std::size_t size, write_op* op)
     {
-        return beast_asio_helpers::
-            allocate(size, op->d_.handler());
+        using boost::asio::asio_handler_allocate;
+        return asio_handler_allocate(
+            size, std::addressof(op->d_.handler()));
     }
 
     friend
     void asio_handler_deallocate(
         void* p, std::size_t size, write_op* op)
     {
-        return beast_asio_helpers::
-            deallocate(p, size, op->d_.handler());
+        using boost::asio::asio_handler_deallocate;
+        asio_handler_deallocate(
+            p, size, std::addressof(op->d_.handler()));
     }
 
     friend
@@ -856,8 +861,9 @@ public:
     friend
     void asio_handler_invoke(Function&& f, write_op* op)
     {
-        return beast_asio_helpers::
-            invoke(f, op->d_.handler());
+        using boost::asio::asio_handler_invoke;
+        asio_handler_invoke(
+            f, std::addressof(op->d_.handler()));
     }
 };
 
@@ -881,7 +887,7 @@ operator()(error_code ec, bool again)
             auto const fin = d.remain <= 0;
             if(fin)
                 d.state = 99;
-            auto const pb = prepare_buffers(n, d.cb);
+            auto const pb = buffer_prefix(n, d.cb);
             d.cb.consume(n);
             d.ws.async_write_frame(fin, pb, std::move(*this));
             return;
@@ -896,21 +902,22 @@ operator()(error_code ec, bool again)
 
 template<class NextLayer>
 template<class ConstBufferSequence, class WriteHandler>
-typename async_completion<
-    WriteHandler, void(error_code)>::result_type
+async_return_type<
+    WriteHandler, void(error_code)>
 stream<NextLayer>::
 async_write(ConstBufferSequence const& bs, WriteHandler&& handler)
 {
-    static_assert(is_AsyncStream<next_layer_type>::value,
+    static_assert(is_async_stream<next_layer_type>::value,
         "AsyncStream requirements not met");
-    static_assert(beast::is_ConstBufferSequence<
+    static_assert(beast::is_const_buffer_sequence<
         ConstBufferSequence>::value,
             "ConstBufferSequence requirements not met");
-    beast::async_completion<
-        WriteHandler, void(error_code)> completion{handler};
-    write_op<ConstBufferSequence, decltype(completion.handler)>{
-        completion.handler, *this, bs};
-    return completion.result.get();
+    async_completion<WriteHandler,
+        void(error_code)> init{handler};
+    write_op<ConstBufferSequence, handler_type<
+        WriteHandler, void(error_code)>>{
+            init.completion_handler, *this, bs};
+    return init.result.get();
 }
 
 template<class NextLayer>
@@ -919,15 +926,15 @@ void
 stream<NextLayer>::
 write(ConstBufferSequence const& buffers)
 {
-    static_assert(is_SyncStream<next_layer_type>::value,
+    static_assert(is_sync_stream<next_layer_type>::value,
         "SyncStream requirements not met");
-    static_assert(beast::is_ConstBufferSequence<
+    static_assert(beast::is_const_buffer_sequence<
         ConstBufferSequence>::value,
             "ConstBufferSequence requirements not met");
     error_code ec;
     write(buffers, ec);
     if(ec)
-        throw system_error{ec};
+        BOOST_THROW_EXCEPTION(system_error{ec});
 }
 
 template<class NextLayer>
@@ -936,9 +943,9 @@ void
 stream<NextLayer>::
 write(ConstBufferSequence const& buffers, error_code& ec)
 {
-    static_assert(is_SyncStream<next_layer_type>::value,
+    static_assert(is_sync_stream<next_layer_type>::value,
         "SyncStream requirements not met");
-    static_assert(beast::is_ConstBufferSequence<
+    static_assert(beast::is_const_buffer_sequence<
         ConstBufferSequence>::value,
             "ConstBufferSequence requirements not met");
     write_frame(true, buffers, ec);

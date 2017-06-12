@@ -12,13 +12,12 @@
 #include "mime_type.hpp"
 
 #include <beast/http.hpp>
-#include <beast/core/handler_helpers.hpp>
 #include <beast/core/handler_ptr.hpp>
-#include <beast/core/placeholders.hpp>
-#include <beast/core/streambuf.hpp>
+#include <beast/core/multi_buffer.hpp>
 #include <boost/asio.hpp>
 #include <cstddef>
 #include <cstdio>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <mutex>
@@ -58,7 +57,7 @@ public:
             boost::asio::socket_base::max_connections);
         acceptor_.async_accept(sock_,
             std::bind(&http_async_server::on_accept, this,
-                beast::asio::placeholders::error));
+                std::placeholders::_1));
         thread_.reserve(threads);
         for(std::size_t i = 0; i < threads; ++i)
             thread_.emplace_back(
@@ -98,11 +97,11 @@ private:
 
             data(Handler& handler, Stream& s_,
                     message<isRequest, Body, Fields>&& m_)
-                : cont(beast_asio_helpers::
-                    is_continuation(handler))
-                , s(s_)
+                : s(s_)
                 , m(std::move(m_))
             {
+                using boost::asio::asio_handler_is_continuation;
+                cont = asio_handler_is_continuation(std::addressof(handler));
             }
         };
 
@@ -137,16 +136,18 @@ private:
         void* asio_handler_allocate(
             std::size_t size, write_op* op)
         {
-            return beast_asio_helpers::
-                allocate(size, op->d_.handler());
+            using boost::asio::asio_handler_allocate;
+            return asio_handler_allocate(
+                size, std::addressof(op->d_.handler()));
         }
 
         friend
         void asio_handler_deallocate(
             void* p, std::size_t size, write_op* op)
         {
-            return beast_asio_helpers::
-                deallocate(p, size, op->d_.handler());
+            using boost::asio::asio_handler_deallocate;
+            asio_handler_deallocate(
+                p, size, std::addressof(op->d_.handler()));
         }
 
         friend
@@ -159,8 +160,9 @@ private:
         friend
         void asio_handler_invoke(Function&& f, write_op* op)
         {
-            return beast_asio_helpers::
-                invoke(f, op->d_.handler());
+            using boost::asio::asio_handler_invoke;
+            asio_handler_invoke(
+                f, std::addressof(op->d_.handler()));
         }
     };
 
@@ -181,7 +183,7 @@ private:
     class peer : public std::enable_shared_from_this<peer>
     {
         int id_;
-        streambuf sb_;
+        multi_buffer sb_;
         socket_type sock_;
         http_async_server& server_;
         boost::asio::io_service::strand strand_;
@@ -205,7 +207,8 @@ private:
         void
         fail(error_code ec, std::string what)
         {
-            if(ec != boost::asio::error::operation_aborted)
+            if(ec != boost::asio::error::operation_aborted &&
+                    ec != error::end_of_stream)
                 server_.log("#", id_, " ", what, ": ", ec.message(), "\n");
         }
 
@@ -218,60 +221,57 @@ private:
         {
             async_read(sock_, sb_, req_, strand_.wrap(
                 std::bind(&peer::on_read, shared_from_this(),
-                    asio::placeholders::error)));
+                    std::placeholders::_1)));
         }
 
         void on_read(error_code const& ec)
         {
             if(ec)
                 return fail(ec, "read");
-            auto path = req_.url;
+            auto path = req_.target().to_string();
             if(path == "/")
                 path = "/index.html";
             path = server_.root_ + path;
             if(! boost::filesystem::exists(path))
             {
                 response<string_body> res;
-                res.status = 404;
-                res.reason = "Not Found";
+                res.result(status::not_found);
                 res.version = req_.version;
-                res.fields.insert("Server", "http_async_server");
-                res.fields.insert("Content-Type", "text/html");
+                res.insert(field::server, "http_async_server");
+                res.insert(field::content_type, "text/html");
                 res.body = "The file '" + path + "' was not found";
-                prepare(res);
+                res.prepare();
                 async_write(sock_, std::move(res),
                     std::bind(&peer::on_write, shared_from_this(),
-                        asio::placeholders::error));
+                        std::placeholders::_1));
                 return;
             }
             try
             {
                 resp_type res;
-                res.status = 200;
-                res.reason = "OK";
+                res.result(status::ok);
                 res.version = req_.version;
-                res.fields.insert("Server", "http_async_server");
-                res.fields.insert("Content-Type", mime_type(path));
+                res.insert(field::server, "http_async_server");
+                res.insert(field::content_type, mime_type(path));
                 res.body = path;
-                prepare(res);
+                res.prepare();
                 async_write(sock_, std::move(res),
                     std::bind(&peer::on_write, shared_from_this(),
-                        asio::placeholders::error));
+                        std::placeholders::_1));
             }
             catch(std::exception const& e)
             {
                 response<string_body> res;
-                res.status = 500;
-                res.reason = "Internal Error";
+                res.result(status::internal_server_error);
                 res.version = req_.version;
-                res.fields.insert("Server", "http_async_server");
-                res.fields.insert("Content-Type", "text/html");
+                res.insert(field::server, "http_async_server");
+                res.insert(field::content_type, "text/html");
                 res.body =
                     std::string{"An internal error occurred"} + e.what();
-                prepare(res);
+                res.prepare();
                 async_write(sock_, std::move(res),
                     std::bind(&peer::on_write, shared_from_this(),
-                        asio::placeholders::error));
+                        std::placeholders::_1));
             }
         }
 
@@ -312,7 +312,7 @@ private:
         socket_type sock(std::move(sock_));
         acceptor_.async_accept(sock_,
             std::bind(&http_async_server::on_accept, this,
-                asio::placeholders::error));
+                std::placeholders::_1));
         std::make_shared<peer>(std::move(sock), *this)->run();
     }
 };

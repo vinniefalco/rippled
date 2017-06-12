@@ -8,7 +8,7 @@
 #ifndef BEAST_HTTP_DETAIL_RFC7230_HPP
 #define BEAST_HTTP_DETAIL_RFC7230_HPP
 
-#include <boost/utility/string_ref.hpp>
+#include <beast/core/string_view.hpp>
 #include <iterator>
 #include <utility>
 
@@ -45,8 +45,8 @@ is_alpha(char c)
         0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, // 224
         0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0  // 240
     };
-    static_assert(sizeof(tab) == 256, "");
-    return tab[static_cast<std::uint8_t>(c)];
+    BOOST_STATIC_ASSERT(sizeof(tab) == 256);
+    return tab[static_cast<unsigned char>(c)];
 }
 
 inline
@@ -72,8 +72,8 @@ is_text(char c)
         1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, // 224
         1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1  // 240
     };
-    static_assert(sizeof(tab) == 256, "");
-    return tab[static_cast<std::uint8_t>(c)];
+    BOOST_STATIC_ASSERT(sizeof(tab) == 256);
+    return tab[static_cast<unsigned char>(c)];
 }
 
 inline
@@ -104,8 +104,8 @@ is_tchar(char c)
         0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, // 224
         0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0  // 240
     };
-    static_assert(sizeof(tab) == 256, "");
-    return tab[static_cast<std::uint8_t>(c)];
+    BOOST_STATIC_ASSERT(sizeof(tab) == 256);
+    return tab[static_cast<unsigned char>(c)];
 }
 
 inline
@@ -133,8 +133,8 @@ is_qdchar(char c)
         1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, // 224
         1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1  // 240
     };
-    static_assert(sizeof(tab) == 256, "");
-    return tab[static_cast<std::uint8_t>(c)];
+    BOOST_STATIC_ASSERT(sizeof(tab) == 256);
+    return tab[static_cast<unsigned char>(c)];
 }
 
 inline
@@ -163,8 +163,8 @@ is_qpchar(char c)
         1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1, // 224
         1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1  // 240
     };
-    static_assert(sizeof(tab) == 256, "");
-    return tab[static_cast<std::uint8_t>(c)];
+    BOOST_STATIC_ASSERT(sizeof(tab) == 256);
+    return tab[static_cast<unsigned char>(c)];
 }
 
 // converts to lower case,
@@ -199,8 +199,8 @@ to_field_char(char c)
         0,   0,   0,   0,   0,   0,   0,    0,   0,   0,   0,   0,   0,   0,   0,    0,
         0,   0,   0,   0,   0,   0,   0,    0,   0,   0,   0,   0,   0,   0,   0,    0
     };
-    static_assert(sizeof(tab) == 256, "");
-    return tab[static_cast<std::uint8_t>(c)];
+    BOOST_STATIC_ASSERT(sizeof(tab) == 256);
+    return tab[static_cast<unsigned char>(c)];
 }
 
 // converts to lower case,
@@ -229,15 +229,16 @@ to_value_char(char c)
         224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, // 224
         240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255  // 240
     };
-    static_assert(sizeof(tab) == 256, "");
-    return static_cast<char>(tab[static_cast<std::uint8_t>(c)]);
+    BOOST_STATIC_ASSERT(sizeof(tab) == 256);
+    return static_cast<char>(tab[static_cast<unsigned char>(c)]);
 }
 
+// VFALCO TODO Make this return unsigned?
 inline
 std::int8_t
 unhex(char c)
 {
-    static char constexpr tab[] = {
+    static signed char constexpr tab[] = {
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, // 0
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, // 16
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, // 32
@@ -255,20 +256,66 @@ unhex(char c)
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, // 224
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1  // 240
     };
-    static_assert(sizeof(tab) == 256, "");
-    return tab[static_cast<std::uint8_t>(c)];
+    BOOST_STATIC_ASSERT(sizeof(tab) == 256);
+    return tab[static_cast<unsigned char>(c)];
 }
 
 template<class FwdIt>
+inline
 void
 skip_ows(FwdIt& it, FwdIt const& end)
 {
     while(it != end)
     {
-        auto const c = *it;
-        if(c != ' ' && c != '\t')
+        if(*it != ' ' && *it != '\t')
             break;
         ++it;
+    }
+}
+
+template<class RanIt>
+inline
+void
+skip_ows_rev(
+    RanIt& it, RanIt const& first)
+{
+    while(it != first)
+    {
+        auto const c = it[-1];
+        if(c != ' ' && c != '\t')
+            break;
+        --it;
+    }
+}
+
+// obs-fold = CRLF 1*( SP / HTAB )
+// return `false` on parse error
+//
+template<class FwdIt>
+inline
+bool
+skip_obs_fold(
+    FwdIt& it, FwdIt const& last)
+{
+    for(;;)
+    {
+        if(*it != '\r')
+            return true;
+        if(++it == last)
+            return false;
+        if(*it != '\n')
+            return false;
+        if(++it == last)
+            return false;
+        if(*it != ' ' && *it != '\t')
+            return false;
+        for(;;)
+        {
+            if(++it == last)
+                return true;
+            if(*it != ' ' && *it != '\t')
+                return true;
+        }
     }
 }
 
@@ -281,8 +328,8 @@ skip_token(FwdIt& it, FwdIt const& last)
 }
 
 inline
-boost::string_ref
-trim(boost::string_ref const& s)
+string_view
+trim(string_view s)
 {
     auto first = s.begin();
     auto last = s.end();
@@ -302,12 +349,12 @@ trim(boost::string_ref const& s)
 
 struct param_iter
 {
-    using iter_type = boost::string_ref::const_iterator;
+    using iter_type = string_view::const_iterator;
 
     iter_type it;
     iter_type first;
     iter_type last;
-    std::pair<boost::string_ref, boost::string_ref> v;
+    std::pair<string_view, string_view> v;
 
     bool
     empty() const
@@ -402,6 +449,53 @@ increment()
         v.second = { &*p2, static_cast<std::size_t>(it - p2) };
     }
 }
+
+/*
+    #token = [ ( "," / token )   *( OWS "," [ OWS token ] ) ]
+*/
+struct opt_token_list_policy
+{
+    using value_type = string_view;
+
+    bool
+    operator()(value_type& v,
+        char const*& it, string_view s) const
+    {
+        v = {};
+        auto need_comma = it != s.begin();
+        for(;;)
+        {
+            detail::skip_ows(it, s.end());
+            if(it == s.end())
+            {
+                it = nullptr;
+                return true;
+            }
+            auto const c = *it;
+            if(detail::is_tchar(c))
+            {
+                if(need_comma)
+                    return false;
+                auto const p0 = it;
+                for(;;)
+                {
+                    ++it;
+                    if(it == s.end())
+                        break;
+                    if(! detail::is_tchar(*it))
+                        break;
+                }
+                v = string_view{&*p0,
+                    static_cast<std::size_t>(it - p0)};
+                return true;
+            }
+            if(c != ',')
+                return false;
+            need_comma = false;
+            ++it;
+        }
+    }
+};
 
 } // detail
 } // http
